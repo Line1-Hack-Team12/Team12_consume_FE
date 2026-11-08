@@ -1,1 +1,115 @@
 @import "tailwindcss";
+
+/*
+ * 디자인 토큰 · Figma "소비 습관 분석 서비스 · UI 디자인 v1"의 Color 변수와 텍스트 스타일을 옮겼다.
+ * 새 색상이나 글자 크기가 필요하면 먼저 여기 토큰을 확인하고, 없을 때만 추가한다.
+ */
+@theme {
+  --font-sans: "Noto Sans KR", system-ui, -apple-system, sans-serif;
+
+  --color-canvas: #f4f5f9;
+  --color-surface: #ffffff;
+  --color-subtle: #eef0f6;
+
+  --color-ink: #161a23;
+  --color-ink-2: #5b6273;
+  --color-ink-3: #9aa1b1;
+
+  --color-brand: #4b4ded;
+  --color-brand-press: #3739c9;
+  --color-brand-tint: #ececfe;
+  --color-brand-deep: #1e1f5c;
+
+  --color-coral: #ff6a3d;
+  --color-coral-ink: #c9481f;
+  --color-coral-tint: #ffeee7;
+
+  --color-success: #12a57a;
+  --color-success-ink: #0b7a5a;
+  --color-success-tint: #e3f6ef;
+  --color-warning: #e89a00;
+  --color-warning-ink: #8f5f00;
+  --color-warning-tint: #fff4db;
+  --color-danger: #e5484d;
+  --color-danger-ink: #c2353a;
+  --color-danger-tint: #fdecec;
+
+  --color-line: #e3e6ee;
+  --color-line-strong: #c9ced8;
+}
+
+/* 텍스트 스타일 (Figma Text Styles와 같은 이름) */
+@utility text-display {
+  font-size: 34px;
+  line-height: 1.2;
+  font-weight: 900;
+  letter-spacing: -0.015em;
+}
+@utility text-title-l {
+  font-size: 24px;
+  line-height: 1.35;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+@utility text-title-m {
+  font-size: 20px;
+  line-height: 1.4;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+@utility text-heading {
+  font-size: 17px;
+  line-height: 1.45;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+@utility text-body-b {
+  font-size: 15px;
+  line-height: 1.5;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+@utility text-body-m {
+  font-size: 15px;
+  line-height: 1.5;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+}
+@utility text-body {
+  font-size: 15px;
+  line-height: 1.5;
+  font-weight: 400;
+  letter-spacing: -0.015em;
+}
+@utility text-caption-m {
+  font-size: 13px;
+  line-height: 1.45;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+}
+@utility text-caption {
+  font-size: 13px;
+  line-height: 1.45;
+  font-weight: 400;
+  letter-spacing: -0.015em;
+}
+@utility text-micro {
+  font-size: 11px;
+  line-height: 1.4;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-subtle font-sans text-ink antialiased;
+  }
+  button,
+  select,
+  input {
+    font: inherit;
+  }
+}
