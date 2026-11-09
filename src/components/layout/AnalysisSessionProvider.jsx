@@ -9,6 +9,7 @@ const initialState = {
   draft: null,
   confirmed: false,
   snapshot: null,
+  analysis: null,
 }
 
 function reducer(state, action) {
@@ -28,24 +29,27 @@ function reducer(state, action) {
     case 'consent':
       return { ...state, consent: action.value }
     case 'draft':
-      return { ...state, draft: action.draft, confirmed: false, snapshot: null }
+      return { ...state, draft: action.draft, confirmed: false, snapshot: null, analysis: null }
     case 'updateTransaction': {
       if (!state.draft) return state
       const transactions = state.draft.transactions.map((t) => (t.id === action.id ? { ...t, ...action.patch } : t))
       // 수정하면 확인 체크를 해제한다 (F06)
-      return { ...state, draft: { ...state.draft, transactions, revision: state.draft.revision + 1 }, confirmed: false }
+      return { ...state, draft: { ...state.draft, transactions, revision: state.draft.revision + 1 }, confirmed: false, snapshot: null, analysis: null }
     }
     case 'duplicateDecision': {
       if (!state.draft) return state
       const duplicateGroups = state.draft.duplicateGroups.map((g) =>
         g.id === action.id ? { ...g, decision: action.decision, reviewed: true } : g,
       )
-      return { ...state, draft: { ...state.draft, duplicateGroups, revision: state.draft.revision + 1 }, confirmed: false }
+      return { ...state, draft: { ...state.draft, duplicateGroups, revision: state.draft.revision + 1 }, confirmed: false, snapshot: null, analysis: null }
     }
     case 'confirmed':
       return { ...state, confirmed: action.value }
     case 'snapshot':
-      return { ...state, snapshot: action.snapshot }
+      return { ...state, snapshot: action.snapshot, analysis: null }
+    case 'analysis':
+      if (action.analysis?.snapshotId !== state.snapshot?.id) return state
+      return { ...state, analysis: action.analysis }
     default:
       return state
   }
@@ -90,6 +94,7 @@ export default function AnalysisSessionProvider({ children }) {
       setDuplicateDecision: (id, decision) => dispatch({ type: 'duplicateDecision', id, decision }),
       setConfirmed: (value) => dispatch({ type: 'confirmed', value }),
       setSnapshot: (snapshot) => dispatch({ type: 'snapshot', snapshot }),
+      setAnalysis: (analysis) => dispatch({ type: 'analysis', analysis }),
     }),
     [addFiles, removeFile],
   )

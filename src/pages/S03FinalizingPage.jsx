@@ -7,6 +7,7 @@ import { SCREEN } from '../constants/screens'
 import { useAnalysisSession } from '../hooks/analysisSessionContext'
 import { useNavigation } from '../hooks/navigationContext'
 import useJobPolling from '../hooks/useJobPolling'
+import { createMockAnalysis } from '../mocks/analysis'
 import { getJob, startAnalysisJob } from '../mocks/jobs'
 import { formatKRW } from '../utils/format'
 
@@ -21,14 +22,14 @@ const TONE_LABEL = { coach: '코치', friend: '친구', grandma: '할머니' }
 // S03-P 확정 후 최종 분석 · snapshot으로만 분석하고 끝나면 S05로 간다
 export default function S03FinalizingPage() {
   const { navigate } = useNavigation()
-  const { snapshot, settings } = useAnalysisSession()
+  const { snapshot, settings, setAnalysis } = useAnalysisSession()
   const [jobId, setJobId] = useState(null)
   const { job, error } = useJobPolling(jobId, getJob)
 
   useEffect(() => {
     if (!snapshot) return undefined
     let cancelled = false
-    // TODO(API): POST /sessions/{sid}/analyses { snapshot_id }
+    // TODO(API): 확정 snapshot을 분석하는 실제 서버 작업으로 교체한다. API 계약은 미정이다.
     startAnalysisJob({ snapshotId: snapshot.id }).then((r) => {
       if (!cancelled) setJobId(r.jobId)
     })
@@ -38,8 +39,12 @@ export default function S03FinalizingPage() {
   }, [snapshot])
 
   useEffect(() => {
-    if (job?.state === 'succeeded') navigate(SCREEN.S05, {}, { replace: true })
-  }, [job?.state, navigate])
+    if (job?.state !== 'succeeded' || !snapshot) return
+    // 목업 job의 완료 결과다. 추출 중 임시 결과를 최종 분석에 재사용하지 않는다.
+    const scenario = new URLSearchParams(window.location.search).get('demo')
+    setAnalysis(createMockAnalysis(snapshot, { scenario }))
+    navigate(SCREEN.S05, {}, { replace: true })
+  }, [job?.state, snapshot, setAnalysis, navigate])
 
   if (!snapshot) {
     return (

@@ -9,10 +9,10 @@ const TONE = {
 }
 
 // 아이콘을 둥근 사각 배경에 담는다 (카드 앞머리용)
-export default function IconBox({ name, tone = 'brand', size = 20, className = '' }) {
+export default function IconBox({ name, tone = 'brand', size = 20, className = '', children }) {
   return (
     <span className={`inline-flex shrink-0 rounded-xl p-[9px] ${TONE[tone]} ${className}`}>
-      <Icon name={name} size={size} />
+      {children ?? <Icon name={name} size={size} />}
     </span>
   )
 }
