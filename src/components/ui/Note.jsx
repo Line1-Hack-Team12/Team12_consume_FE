@@ -9,11 +9,11 @@ const TONE = {
   danger: ['bg-danger-tint text-ink', 'text-danger-ink'],
 }
 
-export default function Note({ tone = 'gray', icon = 'info', className = '', children }) {
+export default function Note({ tone = 'gray', icon = 'info', iconContent, className = '', children }) {
   const [box, iconColor] = TONE[tone]
   return (
     <div className={`flex items-start gap-2 rounded-xl px-3.5 py-3 text-caption ${box} ${className}`}>
-      <Icon name={icon} size={16} className={`mt-px ${iconColor}`} />
+      {iconContent ?? <Icon name={icon} size={16} className={`mt-px ${iconColor}`} />}
       <div className="min-w-0 flex-1">{children}</div>
     </div>
   )

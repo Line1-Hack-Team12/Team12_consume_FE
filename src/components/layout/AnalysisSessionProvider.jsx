@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from 'react'
 import { DEFAULT_MONTH_COUNT, DEFAULT_TONE } from '../../constants/limits'
 import { AnalysisSessionContext } from '../../hooks/analysisSessionContext'
 import { createPatternResponseStore } from '../../mocks/patternResponses'
+import { createSavingsPlanStore } from '../../mocks/plans'
 
 const initialState = {
   settings: { monthCount: DEFAULT_MONTH_COUNT, lastMonth: '', region: '', payday: '', tone: DEFAULT_TONE },
@@ -60,10 +61,13 @@ export default function AnalysisSessionProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState)
   const urlsRef = useRef(new Set())
   const [patternResponseStore] = useState(createPatternResponseStore)
+  const [savingsPlanStore] = useState(() => createSavingsPlanStore({ responseStore: patternResponseStore }))
+  const selectedPlan = useSyncExternalStore(savingsPlanStore.subscribe, savingsPlanStore.getSelectedPlan, savingsPlanStore.getSelectedPlan)
 
   useEffect(() => {
     patternResponseStore.setSnapshot(state.snapshot?.id ?? null)
-  }, [patternResponseStore, state.snapshot?.id])
+    savingsPlanStore.setSnapshot(state.snapshot?.id ?? null)
+  }, [patternResponseStore, savingsPlanStore, state.snapshot?.id])
 
   // 화면을 떠날 때 미리보기용 object URL을 정리한다
   useEffect(() => {
@@ -105,6 +109,6 @@ export default function AnalysisSessionProvider({ children }) {
     [addFiles, removeFile],
   )
 
-  const value = useMemo(() => ({ ...state, ...actions, patternResponseStore }), [state, actions, patternResponseStore])
+  const value = useMemo(() => ({ ...state, ...actions, patternResponseStore, savingsPlanStore, selectedPlan }), [state, actions, patternResponseStore, savingsPlanStore, selectedPlan])
   return <AnalysisSessionContext.Provider value={value}>{children}</AnalysisSessionContext.Provider>
 }

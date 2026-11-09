@@ -106,6 +106,22 @@ export function createPatternResponseStore() {
         replace(key, { ...entry, saved: pause(entry.saved), draft: pause(entry.draft), dirty: false, saving: false, editVersion: entry.editVersion + 1 })
       }
     },
+    enableFromPlan({ snapshotId, patterns, designPreview = false, planId }) {
+      const enabled = []
+      for (const pattern of patterns) {
+        const key = `${designPreview ? 'preview' : 'snapshot'}:${snapshotId}:${pattern.id}`
+        if (!isActive(key) || !pattern.reminderSuggestion) continue
+        const entry = entries.get(key) ?? initialRecord(createInitialPatternResponse(pattern, { designPreview }))
+        if (entry.draft.response_status === 'not_applicable' || entry.saved.response_status === 'not_applicable') continue
+        const suggestion = pattern.reminderSuggestion
+        const reminder = { mode: 'demo', state: 'enabled', weekday: suggestion.weekday, time: suggestion.time, source: 'plan', planId }
+        if (validatePatternResponse({ ...entry.draft, reminder }, pattern)) continue
+        const revision = entry.saved.revision + 1
+        replace(key, { ...entry, saved: { ...entry.saved, revision, reminder }, draft: { ...entry.draft, revision, reminder }, editVersion: entry.editVersion + 1 })
+        enabled.push(pattern.id)
+      }
+      return enabled
+    },
     save(key, fallback, pattern, { failureMode = null } = {}) {
       if (pending.has(key)) return pending.get(key)
       if (!entries.get(key)?.dirty) return Promise.resolve(true)
