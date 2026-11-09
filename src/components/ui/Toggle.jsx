@@ -1,5 +1,5 @@
 // Figma Toggle: On=true | false · role="switch"
-export default function Toggle({ checked, onChange, disabled = false, label }) {
+export default function Toggle({ checked, onChange, disabled = false, label, checkedContent }) {
   return (
     <button
       type="button"
@@ -12,9 +12,9 @@ export default function Toggle({ checked, onChange, disabled = false, label }) {
         checked ? 'bg-brand' : 'bg-line-strong'
       }`}
     >
-      <span
+      {checked && checkedContent ? checkedContent : <span
         className={`absolute top-[3px] size-[22px] rounded-full bg-surface shadow transition-[left] ${checked ? 'left-[23px]' : 'left-[3px]'}`}
-      />
+      />}
     </button>
   )
 }

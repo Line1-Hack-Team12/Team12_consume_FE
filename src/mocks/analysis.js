@@ -1,4 +1,5 @@
 import { CATEGORIES } from '../constants/limits'
+import { formatKRW } from '../utils/format'
 import { addMonths, formatShortMonth, formatSlotRange } from '../utils/months'
 
 // S05 데모 전용 결과 어댑터다. 실제 분석·설명 API 계약이 정해지면 서버 결과로 교체한다.
@@ -13,6 +14,11 @@ const EXAMPLES = [
     select: (row) => row.category === 'delivery' && row.time && row.time >= '21:00',
     question: '늦은 시간에 배달을 주문한 날, 보통 어떤 일이 있었나요?',
     action: '다음 주문 전에는 냉장고를 한 번 확인해 보세요.',
+    friendQuestion: '늦게 배달을 주문한 날엔 보통 무슨 일이 있었어?',
+    friendAction: '다음 주문 전엔 냉장고를 한 번 확인해 보자.',
+    grandmaQuestion: '늦은 시간에 배달시킨 날에는 무슨 일이 있었니?',
+    grandmaAction: '다음에 주문하기 전에는 냉장고부터 한번 열어보렴.',
+    recommendedTags: ['overtime', 'stress', 'habit'],
   },
   {
     key: 'taxi',
@@ -22,6 +28,11 @@ const EXAMPLES = [
     select: (row) => row.category === 'transport' && row.subcategory === '택시',
     question: '택시를 이용한 날에는 어떤 사정이 있었나요?',
     action: '다음 이동 전에 대중교통 경로를 한 번 확인해 보세요.',
+    friendQuestion: '택시를 탄 날에는 어떤 일이 있었어?',
+    friendAction: '다음에 이동할 땐 대중교통 경로부터 한번 보자.',
+    grandmaQuestion: '택시를 탔던 날에는 어떤 사정이 있었니?',
+    grandmaAction: '다음에는 대중교통으로 갈 수 있는지 한번 보렴.',
+    recommendedTags: ['stress', 'habit', 'no_specific_reason'],
   },
   {
     key: 'weekend-cafe',
@@ -35,6 +46,11 @@ const EXAMPLES = [
     },
     question: '주말에 카페를 찾을 때는 보통 어떤 계획이 있나요?',
     action: '다음 주말에는 카페 방문 횟수를 한 번 정해 보세요.',
+    friendQuestion: '주말에 카페를 갈 땐 보통 어떤 계획이 있어?',
+    friendAction: '다음 주말엔 카페에 몇 번 갈지 한번 정해 보자.',
+    grandmaQuestion: '주말에 카페 갈 때는 보통 무슨 계획이 있니?',
+    grandmaAction: '다음 주말에는 카페에 몇 번 갈지 정해 보렴.',
+    recommendedTags: ['habit', 'stress', 'no_specific_reason'],
   },
 ]
 
@@ -111,12 +127,13 @@ function examplePattern(example, rows, snapshotId, slots) {
   const observedDays = new Set(evidence.map((row) => row.date)).size
   const sumKrw = evidence.reduce((sum, row) => sum + row.amountKrw, 0)
   const observation = `서로 다른 ${observedDays}일 관찰`
+  const monthlyAmountKrw = Math.round(sumKrw / Math.max(1, slots.length))
   return {
     id: `${snapshotId}_${example.key}`,
     title: example.title,
     observation,
     amountLabel: '월 환산',
-    monthlyAmountKrw: Math.round(sumKrw / Math.max(1, slots.length)),
+    monthlyAmountKrw,
     basis: `${formatSlotRange(slots)} 합계 ÷ 채워진 ${slots.length}개월`,
     evidenceGrade: 'normal',
     icon: example.icon,
@@ -125,10 +142,19 @@ function examplePattern(example, rows, snapshotId, slots) {
     observedDays,
     sumKrw,
     chainedSumKrw: 0,
+    directMonthlyKrw: monthlyAmountKrw,
+    chainedMonthlyKrw: 0,
+    directDescription: `직접 지출 ${evidence.length}건`,
+    chainedDescription: '연결된 후속 지출 근거 없음',
+    totalBasis: `${formatSlotRange(slots)} 합계 ${formatKRW(sumKrw)} ÷ ${slots.length}개월`,
+    associationNote: '함께 관찰된 지출이 원인 관계를 뜻하지는 않아요.',
+    evidence: evidence.map(({ id, date, time, merchant, amountKrw }) => ({ id, date, time, merchant, amountKrw })),
+    recommendedTags: example.recommendedTags,
+    reminderSuggestion: null,
     copyByTone: {
       coach: { observation, hypothesisQuestion: example.question, action: example.action },
-      friend: { observation: `서로 다른 ${observedDays}일에 보였어`, hypothesisQuestion: example.question, action: example.action },
-      grandma: { observation: `서로 다른 ${observedDays}일에 보였구나`, hypothesisQuestion: example.question, action: example.action },
+      friend: { observation: `서로 다른 ${observedDays}일에 보였어`, hypothesisQuestion: example.friendQuestion, action: example.friendAction },
+      grandma: { observation: `서로 다른 ${observedDays}일에 보였구나`, hypothesisQuestion: example.grandmaQuestion, action: example.grandmaAction },
     },
   }
 }

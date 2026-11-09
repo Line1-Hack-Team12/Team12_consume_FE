@@ -7,9 +7,11 @@ const TONE = {
   deep: 'bg-brand-deep text-white',
 }
 
-export default function Card({ tone = 'surface', as: Tag = 'section', className = '', children, ...props }) {
+const PADDING = { md: 'p-[18px]', lg: 'p-5', none: '' }
+
+export default function Card({ tone = 'surface', as: Tag = 'section', padding = 'md', className = '', children, ...props }) {
   return (
-    <Tag className={`rounded-[18px] p-[18px] ${TONE[tone]} ${className}`} {...props}>
+    <Tag className={`rounded-[18px] ${PADDING[padding]} ${TONE[tone]} ${className}`} {...props}>
       {children}
     </Tag>
   )

@@ -9,6 +9,7 @@ import Icon from '../ui/Icon'
 export default function ScreenLayout({
   showBack = true,
   onBack,
+  backIcon,
   backFallback,
   title,
   description,
@@ -29,7 +30,7 @@ export default function ScreenLayout({
               className="-m-1 rounded-lg p-1 focus-visible:outline-2 focus-visible:outline-brand"
               aria-label="뒤로 가기"
             >
-              <Icon name="chevron-left" />
+              {backIcon ?? <Icon name="chevron-left" />}
             </button>
           ) : (
             <span className="w-3" />

@@ -51,7 +51,7 @@ export default function S03ReviewPage() {
   const confirm = () => {
     // TODO(API): POST /sessions/{sid}/snapshots { expected_revision, confirmation: true }
     setSnapshot({
-      id: `sn_${draft.revision}`,
+      id: `sn_${crypto.randomUUID()}`,
       sourceRevision: draft.revision,
       summary,
       slots,
