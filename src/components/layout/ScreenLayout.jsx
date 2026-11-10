@@ -8,6 +8,7 @@ import Icon from '../ui/Icon'
  */
 export default function ScreenLayout({
   showBack = true,
+  reserveBackSpace = true,
   onBack,
   backIcon,
   backFallback,
@@ -22,7 +23,7 @@ export default function ScreenLayout({
   return (
     <div className="flex min-h-dvh justify-center">
       <div className={`relative flex min-h-dvh w-full max-w-[390px] flex-col ${tone === 'surface' ? 'bg-surface' : 'bg-canvas'}`}>
-        <header className="flex h-12 items-center gap-1.5 pt-[env(safe-area-inset-top)] pr-6 pl-3">
+        <header className={`flex h-12 items-center gap-1.5 pt-[env(safe-area-inset-top)] pr-6 ${!showBack && !reserveBackSpace ? 'pl-4' : 'pl-3'}`}>
           {showBack ? (
             <button
               type="button"
@@ -32,9 +33,9 @@ export default function ScreenLayout({
             >
               {backIcon ?? <Icon name="chevron-left" />}
             </button>
-          ) : (
+          ) : reserveBackSpace ? (
             <span className="w-3" />
-          )}
+          ) : null}
           <span className="text-caption-m text-ink-2">소비 습관 돌아보기</span>
         </header>
 

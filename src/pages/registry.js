@@ -12,6 +12,7 @@ import S05PatternDetailPage from './S05PatternDetailPage'
 import S06ReminderPage from './S06ReminderPage'
 import S08ReportPage from './S08ReportPage'
 import S09SavingsPlanPage from './S09SavingsPlanPage'
+import S10CompletionPage from './S10CompletionPage'
 
 // 화면 ID → 화면 컴포넌트. 새 화면을 만들면 여기에 한 줄 추가한다.
 // 등록하지 않은 ID는 PlaceholderPage가 보인다.
@@ -28,5 +29,6 @@ export const SCREEN_COMPONENTS = {
   [SCREEN.S06]: S06ReminderPage,
   [SCREEN.S08]: S08ReportPage,
   [SCREEN.S09]: S09SavingsPlanPage,
+  [SCREEN.S10]: S10CompletionPage,
   [SCREEN.E02]: E02DuplicatePage,
 }
