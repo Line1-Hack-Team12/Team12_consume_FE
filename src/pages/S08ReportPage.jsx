@@ -1,5 +1,5 @@
 import back from '../assets/icons/chevron-left.svg'
-import info from '../assets/s08/info.svg'
+import info from '../assets/icons/info.svg'
 import ScreenLayout from '../components/layout/ScreenLayout'
 import Button from '../components/ui/Button'
 import Note from '../components/ui/Note'
