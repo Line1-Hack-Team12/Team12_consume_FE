@@ -44,8 +44,13 @@ export const S05_PREVIEW_ANALYSIS = {
         { id: 'preview-delivery-3', date: '2026-10-01', time: '22:35', merchant: '배민', amountKrw: 27000 },
       ],
       recommendedTags: ['overtime', 'stress', 'habit'],
-      reminderSuggestion: { weekday: 4, weekdayLabel: '목요일', time: '21:00' },
-      initialResponse: { response_status: 'answered', cause_tags: ['overtime'], reminder: { state: 'enabled' } },
+      reminderSuggestion: { weekday: 4, weekdayLabel: '목요일', time: '21:00', expectedConsumptionTime: '22:00' },
+      reminderPreview: {
+        action: '주문을 고민한다면 냉장고부터 확인해 보세요.',
+        actionByTag: { overtime: '야근 날 주문을 고민한다면 냉장고부터 확인해 보세요.' },
+        observation: '목요일 밤 배달이 13주 중 11회 관찰됐어요.',
+      },
+      initialResponse: { response_status: 'answered', cause_tags: ['overtime'], reminder: { state: 'enabled', source: 'plan' } },
       copyByTone: {
         coach: { observation: '13주 중 11회', hypothesisQuestion: '주 후반 피로 때문일까요?\n그날 보통 무슨 일이 있나요?', action: '주문 전 냉장고를 한 번 열어보세요.' },
         friend: { observation: '13주 중 11회 보였어', hypothesisQuestion: '주 후반이라 피곤했던 걸까?\n그날은 보통 무슨 일이 있어?', action: '주문 전에 냉장고를 한 번 열어보자.' },

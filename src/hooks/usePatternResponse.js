@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
 import { CAUSE_TAGS, MAX_CUSTOM_CAUSE_LENGTH, RESPONSE_STATUSES } from '../constants/patternResponses'
+import { isValidReminderTime } from '../constants/reminders'
 import { createInitialPatternResponse } from '../mocks/patternResponses'
 import { useAnalysisSession } from './analysisSessionContext'
 
@@ -48,8 +49,20 @@ export default function usePatternResponse({ pattern, snapshotId, designPreview 
     },
     setReminderEnabled(enabled) {
       const current = latest()
-      if (enabled && (current.response_status === 'not_applicable' || !pattern?.reminderSuggestion)) return
+      if (!key) return false
+      if (!enabled) {
+        store.disableReminder(key, initial)
+        return true
+      }
+      if (current.response_status === 'not_applicable' || !pattern?.reminderSuggestion || !isValidReminderTime(current.reminder.time)) return false
       update({ ...current, reminder: { ...current.reminder, state: enabled ? 'enabled' : 'disabled' } })
+      return true
+    },
+    setReminderTime(time) {
+      if (!key || !pattern?.reminderSuggestion || !isValidReminderTime(time)) return false
+      const current = latest()
+      update({ ...current, reminder: { ...current.reminder, time } })
+      return true
     },
     save,
     retry: save,

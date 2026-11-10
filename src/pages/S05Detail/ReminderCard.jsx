@@ -13,7 +13,7 @@ export default function ReminderCard({ pattern, tone, response, onToggle }) {
   const suggestion = pattern.reminderSuggestion
   const notApplicable = response.response_status === 'not_applicable'
   const disabled = notApplicable || !suggestion
-  const title = suggestion ? `${suggestion.weekdayLabel} ${suggestion.time} 사전 알림` : '사전 알림'
+  const title = suggestion ? `${suggestion.weekdayLabel} ${response.reminder.time ?? suggestion.time} 사전 알림` : '사전 알림'
 
   return (
     <Card className="flex flex-col gap-3">
