@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import bell from '../../assets/s05-detail/bell.svg'
-import toggleOn from '../../assets/s05-detail/toggle-on.svg'
+import toggleOn from '../../assets/icons/toggle-on.svg'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'

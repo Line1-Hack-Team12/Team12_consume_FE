@@ -1,5 +1,5 @@
 import moon from '../../assets/s08/moon.svg'
-import check from '../../assets/s08/check.svg'
+import check from '../../assets/icons/check-success.svg'
 import Card from '../../components/ui/Card'
 import Icon from '../../components/ui/Icon'
 

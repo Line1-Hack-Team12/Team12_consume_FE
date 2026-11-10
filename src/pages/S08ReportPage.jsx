@@ -1,4 +1,4 @@
-import back from '../assets/s05-detail/back.svg'
+import back from '../assets/icons/chevron-left.svg'
 import info from '../assets/s08/info.svg'
 import ScreenLayout from '../components/layout/ScreenLayout'
 import Button from '../components/ui/Button'

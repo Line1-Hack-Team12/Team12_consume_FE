@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import actionCheck from '../assets/s05-detail/action-check.svg'
-import back from '../assets/s05-detail/back.svg'
+import actionCheck from '../assets/icons/check-success.svg'
+import back from '../assets/icons/chevron-left.svg'
 import ScreenLayout from '../components/layout/ScreenLayout'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'

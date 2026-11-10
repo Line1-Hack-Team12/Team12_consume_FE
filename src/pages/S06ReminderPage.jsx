@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import back from '../assets/s05-detail/back.svg'
+import back from '../assets/icons/chevron-left.svg'
 import ScreenLayout from '../components/layout/ScreenLayout'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
