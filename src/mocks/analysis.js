@@ -1,6 +1,7 @@
 import { CATEGORIES } from '../constants/limits'
 import { formatKRW } from '../utils/format'
 import { addMonths, formatShortMonth, formatSlotRange } from '../utils/months'
+import { createMockReport } from './report'
 
 // S05 데모 전용 결과 어댑터다. 실제 분석·설명 API 계약이 정해지면 서버 결과로 교체한다.
 // 아래 샘플 선택은 화면 시연을 위한 예시이며 운영용 탐지·근거 등급 규칙이 아니다.
@@ -168,7 +169,7 @@ export function createMockAnalysis(snapshot, { scenario = null } = {}) {
   const candidates = scenario === 'empty' ? [] : EXAMPLES.map((example) => examplePattern(example, rows, snapshot.id, slots)).filter(Boolean)
   const patterns = candidates.filter((item) => item.observedDays >= 2).sort((a, b) => b.monthlyAmountKrw - a.monthlyAmountKrw)
 
-  return {
+  const analysis = {
     mode: 'demo',
     snapshotId: snapshot.id,
     slots,
@@ -182,4 +183,5 @@ export function createMockAnalysis(snapshot, { scenario = null } = {}) {
     lockedPatterns: candidates.filter((item) => item.observedDays === 1),
     emptyReason: patterns.length === 0 ? 'NO_SUPPORTED_PATTERN' : null,
   }
+  return { ...analysis, report: createMockReport({ snapshot, analysis, rows }) }
 }

@@ -1,3 +1,5 @@
+import { S08_PREVIEW_REPORT } from './report'
+
 // Figma S05의 배치·문구를 확인하는 개발 전용 합성 예시다.
 // 실제 캡처, 확정 snapshot, 분석 결과나 날씨 근거를 나타내지 않는다.
 // 페이지에서 import.meta.env.DEV && ?demo=s05일 때만 사용하며 세션에 저장하지 않는다.
@@ -9,6 +11,7 @@ export const S05_PREVIEW_ANALYSIS = {
   periodLabel: '업로드한 8~10월 기록 기준',
   expenseCount: null,
   totalKrw: 1243500,
+  report: S08_PREVIEW_REPORT,
   topCategories: [
     { category: 'delivery', label: '배달', sharePercent: 31 },
     { category: 'transport', label: '교통', sharePercent: 18 },
