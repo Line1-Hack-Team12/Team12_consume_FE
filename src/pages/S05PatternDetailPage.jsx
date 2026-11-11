@@ -72,7 +72,7 @@ export default function S05PatternDetailPage({ params }) {
       </div>
 
       <CostBreakdownCard pattern={pattern} />
-      <EvidenceCard key={pattern.id} pattern={pattern} />
+      <EvidenceCard key={`evidence-${pattern.id}`} pattern={pattern} />
       <CauseResponseCard
         pattern={pattern}
         tone={tone}
@@ -98,7 +98,7 @@ export default function S05PatternDetailPage({ params }) {
         <p className="text-body-b">{action}</p>
       </Card>
 
-      <ReminderCard key={pattern.id} pattern={pattern} tone={tone} response={response} onToggle={setReminderEnabled} />
+      <ReminderCard key={`reminder-${pattern.id}`} pattern={pattern} tone={tone} response={response} onToggle={setReminderEnabled} />
       <p className="text-micro text-ink-3">
         {designPreview ? '디자인 미리보기 · Figma의 예시 데이터예요.' : '데모 결과 · 확정한 예시 거래를 사용해요.'} 응답은 현재 세션에서 유지되며, 실제 푸시 발송은 연결되지 않았어요.
       </p>
