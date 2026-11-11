@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import bell from '../../assets/s05-detail/bell.svg'
-import toggleOn from '../../assets/icons/toggle-on.svg'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -26,7 +25,6 @@ export default function ReminderCard({ pattern, tone, response, onToggle }) {
           checked={response.reminder.state === 'enabled'}
           label={title}
           disabled={disabled}
-          checkedContent={<img src={toggleOn} width={48} height={28} alt="" className="block" />}
           onChange={(enabled) => {
             onToggle(enabled)
             if (enabled) setShowPreview(true)

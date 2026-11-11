@@ -1,7 +1,6 @@
 import { useId, useState } from 'react'
 import bell from '../../assets/s06/bell.svg'
 import chevronDown from '../../assets/s06/chevron-down.svg'
-import toggleOn from '../../assets/icons/toggle-on.svg'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -82,7 +81,6 @@ export default function ReminderSettings({ pattern, snapshotId, designPreview, t
       <div className="flex items-center gap-2">
         <p className="min-w-0 flex-1 text-body-m text-ink-2" role="status">{stateLabel}</p>
         <Toggle checked={enabled} label={`${pattern.title} 사전 알림`} disabled={disabled || notApplicable || (!enabled && !timeValid)}
-          checkedContent={<img src={toggleOn} width={48} height={28} alt="" className="block" />}
           onChange={(on) => on ? setReminderEnabled(true) : turnOff()} />
       </div>
       {notApplicable ? <p className="text-caption text-ink-2">해당 없음으로 답한 습관은 알림을 켤 수 없어요. 카드 상세에서 응답을 바꿀 수 있어요.</p> : null}

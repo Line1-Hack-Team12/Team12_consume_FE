@@ -1,5 +1,5 @@
 // Figma Toggle: On=true | false · role="switch"
-export default function Toggle({ checked, onChange, disabled = false, label, checkedContent }) {
+export default function Toggle({ checked, onChange, disabled = false, label }) {
   return (
     <button
       type="button"
@@ -8,13 +8,14 @@ export default function Toggle({ checked, onChange, disabled = false, label, che
       aria-label={label}
       disabled={disabled}
       onClick={() => onChange?.(!checked)}
-      className={`relative h-7 w-12 shrink-0 rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50 ${
+      className={`relative h-7 w-12 shrink-0 rounded-full transition-colors duration-200 ease-out motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50 ${
         checked ? 'bg-brand' : 'bg-line-strong'
       }`}
     >
-      {checked && checkedContent ? checkedContent : <span
-        className={`absolute top-[3px] size-[22px] rounded-full bg-surface shadow transition-[left] ${checked ? 'left-[23px]' : 'left-[3px]'}`}
-      />}
+      <span
+        aria-hidden="true"
+        className={`pointer-events-none absolute top-[3px] left-[3px] size-[22px] rounded-full bg-surface transition-[translate,box-shadow] duration-200 ease-out motion-reduce:transition-none ${checked ? 'translate-x-5 shadow-none' : 'translate-x-0 shadow'}`}
+      />
     </button>
   )
 }
