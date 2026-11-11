@@ -153,7 +153,7 @@ export default function S01SettingsPage() {
       <Section title="말투">
         <div className="flex gap-2" role="group" aria-label="말투">
           {TONES.map((t) => (
-            <Chip key={t.value} selected={settings.tone === t.value} onClick={() => updateSettings({ tone: t.value })}>
+            <Chip key={t.value} showCheck={false} selected={settings.tone === t.value} onClick={() => updateSettings({ tone: t.value })}>
               {t.label}
             </Chip>
           ))}

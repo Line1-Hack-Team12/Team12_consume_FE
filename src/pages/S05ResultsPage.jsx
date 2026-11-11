@@ -85,7 +85,7 @@ export default function S05ResultsPage() {
 
       <div className="flex flex-wrap gap-2" role="group" aria-label="말투">
         {TONES.map((item) => (
-          <Chip key={item.value} selected={tone === item.value} onClick={() => updateSettings({ tone: item.value })}>
+          <Chip key={item.value} showCheck={false} selected={tone === item.value} onClick={() => updateSettings({ tone: item.value })}>
             {item.label}
           </Chip>
         ))}
