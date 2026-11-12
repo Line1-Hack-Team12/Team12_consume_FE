@@ -3,13 +3,16 @@ import Icon from '../../components/ui/Icon'
 import { ACCEPT_ATTR } from '../../constants/limits'
 import { validateFiles } from '../../utils/fileValidation'
 import { formatMonth } from '../../utils/months'
+import CapturePreviewDialog from './CapturePreviewDialog'
 
 // S01 슬롯 하나 · 파일 선택은 로컬 미리보기만 하고 서버로 보내지 않는다
 export default function SlotCard({ month, files, disabled, onAdd, onRemove }) {
   const inputId = useId()
   const [checking, setChecking] = useState(false)
+  const [previewFileId, setPreviewFileId] = useState(null)
   const accepted = files.filter((f) => f.status === 'accepted')
   const rejected = files.filter((f) => f.status === 'rejected')
+  const previewFile = accepted.find((file) => file.id === previewFileId)
 
   const handleChange = async (e) => {
     const picked = Array.from(e.target.files ?? [])
@@ -43,7 +46,15 @@ export default function SlotCard({ month, files, disabled, onAdd, onRemove }) {
         <ul className="flex flex-wrap gap-2">
           {accepted.map((f) => (
             <li key={f.id} className="relative size-[58px] overflow-hidden rounded-[10px] bg-subtle">
-              <img src={f.url} alt={f.name} className="size-full object-cover" />
+              <button
+                type="button"
+                onClick={() => setPreviewFileId(f.id)}
+                aria-label={`${f.name} 크게 보기`}
+                aria-haspopup="dialog"
+                className="block size-full rounded-[10px] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand"
+              >
+                <img src={f.url} alt={f.name} className="size-full object-cover" />
+              </button>
               <button
                 type="button"
                 onClick={() => onRemove(month, f)}
@@ -75,6 +86,7 @@ export default function SlotCard({ month, files, disabled, onAdd, onRemove }) {
           ))}
         </ul>
       ) : null}
+      {previewFile ? <CapturePreviewDialog file={previewFile} onClose={() => setPreviewFileId(null)} /> : null}
     </section>
   )
 }
