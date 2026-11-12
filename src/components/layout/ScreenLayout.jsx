@@ -88,7 +88,7 @@ export default function ScreenLayout({
         <main className={`flex min-w-0 flex-1 flex-col gap-5 px-6 pt-1 pb-[calc(1.75rem+var(--keyboard-offset,0px))] wrap-anywhere ${contentClassName}`}>
           {title ? (
             <div className="flex flex-col gap-1.5">
-              <h1 className="text-title-l whitespace-pre-line">{title}</h1>
+              <h1 tabIndex={-1} className="text-title-l whitespace-pre-line focus:outline-none">{title}</h1>
               {description ? <div className="text-body text-ink-2">{description}</div> : null}
             </div>
           ) : null}

@@ -27,9 +27,12 @@ export default function S03TablePage() {
     if (!hasDraft) return
     const saved = getViewState(current.key)
     if (!saved) return
-    const anchor = Array.from(listRef.current?.children ?? []).find((row) => row.dataset.transactionId === String(saved.anchorId))
+    const rows = Array.from(listRef.current?.children ?? [])
+    const anchor = rows.find((row) => row.dataset.transactionId === String(saved.anchorId))
     const top = anchor ? window.scrollY + anchor.getBoundingClientRect().top - saved.anchorOffset : saved.scrollY
     window.scrollTo({ left: saved.scrollX, top, behavior: 'instant' })
+    const focusRow = rows.find((row) => row.dataset.transactionId === String(saved.focusId))
+    focusRow?.querySelector('button')?.focus({ preventScroll: true })
   }, [current.key, hasDraft, getViewState])
 
   useEffect(() => {
@@ -37,12 +40,13 @@ export default function S03TablePage() {
     const rememberPosition = () => {
       // 이동 직후 발생한 이전 화면의 scroll 이벤트가 복귀 위치를 덮어쓰지 않게 한다.
       if (window.history.state?.screen?.key !== current.key) return
-      saveViewState(current.key, { shown, scrollX: window.scrollX, scrollY: window.scrollY })
+      const focusId = getViewState(current.key)?.focusId
+      saveViewState(current.key, { shown, scrollX: window.scrollX, scrollY: window.scrollY, focusId })
     }
     rememberPosition()
     window.addEventListener('scroll', rememberPosition, { passive: true })
     return () => window.removeEventListener('scroll', rememberPosition)
-  }, [current.key, hasDraft, shown, saveViewState])
+  }, [current.key, hasDraft, shown, getViewState, saveViewState])
 
   if (!draft) {
     return (
@@ -107,13 +111,14 @@ export default function S03TablePage() {
                   <Badge tone="success">포함</Badge>
                 )}
               </div>
-              <Button size="md" variant="secondary" onClick={(event) => {
+              <Button size="md" variant="secondary" aria-label={`${formatShortDate(t.date)} ${t.merchant} ${excluded ? '복원 또는 수정' : '수정'}`} onClick={(event) => {
                 saveViewState(current.key, {
                   shown,
                   scrollX: window.scrollX,
                   scrollY: window.scrollY,
                   anchorId: t.id,
                   anchorOffset: event.currentTarget.closest('li').getBoundingClientRect().top,
+                  focusId: t.id,
                 })
                 navigate(SCREEN.S03_E, { id: t.id })
               }}>

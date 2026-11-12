@@ -20,7 +20,7 @@ export default function S00StartPage() {
       footer={<Button onClick={() => navigate(SCREEN.S01)}>시작하기</Button>}
     >
       <div className="flex flex-col gap-1.5">
-        <h1 className="text-[30px] leading-[1.35] font-bold tracking-[-0.015em]">
+        <h1 tabIndex={-1} className="text-[30px] leading-[1.35] font-bold tracking-[-0.015em] focus:outline-none">
           모르는 소비 습관을
           <br />
           찾아보세요

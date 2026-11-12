@@ -22,6 +22,7 @@ export default function NavigationProvider({ initialId = SCREEN.S00, children })
   const restoringPopRef = useRef(null)
   const skipNextPopRef = useRef(false)
   const viewStatesRef = useRef(new Map())
+  const previousFocusRef = useRef(null)
 
   // 화면 방문별 UI 상태만 메모리에 보관한다. 새로고침 후에는 복원하지 않는다.
   const getViewState = useCallback((key) => viewStatesRef.current.get(key), [])
@@ -35,6 +36,19 @@ export default function NavigationProvider({ initialId = SCREEN.S00, children })
       if (blockerRef.current === blocker) blockerRef.current = null
     }
   }, [])
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      const main = document.querySelector('main')
+      const previousFocus = previousFocusRef.current
+      previousFocusRef.current = null
+      // 목록 복귀나 대화상자에서 이미 정한 포커스는 그대로 둔다.
+      if (document.querySelector('dialog[open]')) return
+      if (main?.contains(document.activeElement) && document.activeElement !== previousFocus) return
+      main?.querySelector('h1')?.focus({ preventScroll: true })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [current.key])
 
   useEffect(() => {
     const previousRestoration = window.history.scrollRestoration
@@ -76,6 +90,7 @@ export default function NavigationProvider({ initialId = SCREEN.S00, children })
         } else {
           window.history.replaceState({ screen: previous }, '', `#/${previous.id}`)
           blockerRef.current(() => {
+            previousFocusRef.current = document.activeElement
             window.history.replaceState({ screen: entry }, '', `#/${entry.id}`)
             currentRef.current = entry
             setCurrent(entry)
@@ -84,6 +99,7 @@ export default function NavigationProvider({ initialId = SCREEN.S00, children })
         }
         return
       }
+      previousFocusRef.current = document.activeElement
       currentRef.current = entry
       setCurrent(entry)
       window.scrollTo(0, 0)
@@ -97,6 +113,7 @@ export default function NavigationProvider({ initialId = SCREEN.S00, children })
 
   const navigate = useCallback((id, params = {}, { replace = false, skipBlocker = false } = {}) => {
     const proceed = () => {
+      previousFocusRef.current = document.activeElement
       const prev = currentRef.current
       const entry = { id, params, depth: replace ? prev.depth : prev.depth + 1, key: crypto.randomUUID() }
       if (replace) window.history.replaceState({ screen: entry }, '', `#/${id}`)

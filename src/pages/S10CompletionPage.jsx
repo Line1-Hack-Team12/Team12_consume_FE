@@ -49,7 +49,7 @@ export default function S10CompletionPage({ params }) {
         <img src={check} width={32} height={32} alt="" className="block" />
       </IconBox>
 
-      <h1 className="text-title-l">소비 돌아보기를<br />마쳤어요</h1>
+      <h1 tabIndex={-1} className="text-title-l focus:outline-none">소비 돌아보기를<br />마쳤어요</h1>
 
       <Card tone="canvas" padding="none" className="px-[18px] pt-4 pb-1.5" aria-labelledby="completion-summary-title">
         <h2 id="completion-summary-title" className="text-caption-m text-ink-2">이번에 확인한 내용</h2>
