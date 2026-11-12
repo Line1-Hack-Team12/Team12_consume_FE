@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import ScreenLayout from '../components/layout/ScreenLayout'
 import Button from '../components/ui/Button'
+import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { SelectField, TextField } from '../components/ui/Field'
 import Note from '../components/ui/Note'
 import { CATEGORIES, DIRECTIONS, KINDS } from '../constants/limits'
@@ -17,11 +18,30 @@ function lastDay(month) {
 
 // S03-E 내역 수정하기
 export default function S03EditPage({ params }) {
-  const { back } = useNavigation()
+  const { back, blockNavigation } = useNavigation()
   const { draft, updateTransaction } = useAnalysisSession()
   const original = draft?.transactions.find((t) => t.id === params?.id)
   const [form, setForm] = useState(() => (original ? { ...original, amountText: formatNumber(original.amountKrw) } : null))
   const [showErrors, setShowErrors] = useState(false)
+  const [pendingLeave, setPendingLeave] = useState(null)
+  const hasChanges = Boolean(original && form && (
+    form.amountText !== formatNumber(original.amountKrw)
+    || ['date', 'time', 'merchant', 'direction', 'kind', 'category', 'subcategory'].some((key) => (form[key] ?? '') !== (original[key] ?? ''))
+  ))
+
+  useEffect(() => {
+    if (!hasChanges) return undefined
+    const unblock = blockNavigation((proceed) => setPendingLeave(() => proceed))
+    const onBeforeUnload = (event) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => {
+      unblock()
+      window.removeEventListener('beforeunload', onBeforeUnload)
+    }
+  }, [hasChanges, blockNavigation])
 
   if (!original || !form) {
     return (
@@ -37,7 +57,7 @@ export default function S03EditPage({ params }) {
   const hasErrors = Object.keys(errors).length > 0
   const subs = CATEGORIES.find((c) => c.value === form.category)?.subs ?? []
   const set = (patch) => setForm((f) => ({ ...f, ...patch }))
-  const done = () => back(SCREEN.S03)
+  const done = () => back(SCREEN.S03, { skipBlocker: true })
 
   const save = () => {
     if (hasErrors) {
@@ -144,6 +164,21 @@ export default function S03EditPage({ params }) {
           빨간 칸을 고쳐야 저장할 수 있어요.
         </Note>
       ) : null}
+      <ConfirmDialog
+        open={Boolean(pendingLeave)}
+        title="수정 중인 내역이 있어요"
+        confirmLabel="계속 수정"
+        cancelLabel="변경 내용 버리기"
+        onConfirm={() => setPendingLeave(null)}
+        onCancel={() => {
+          const proceed = pendingLeave
+          setPendingLeave(null)
+          proceed?.()
+        }}
+        onDismiss={() => setPendingLeave(null)}
+      >
+        저장하지 않고 나가면 변경 내용이 사라져요.
+      </ConfirmDialog>
     </ScreenLayout>
   )
 }
