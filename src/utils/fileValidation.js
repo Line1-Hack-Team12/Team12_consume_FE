@@ -11,13 +11,31 @@ export const REJECT_REASON = {
 }
 
 async function canDecode(file) {
-  if (typeof createImageBitmap !== 'function') return true
+  let image
+  let objectUrl
   try {
-    const bitmap = await createImageBitmap(file)
-    bitmap.close?.()
-    return true
+    if (typeof createImageBitmap === 'function') {
+      const bitmap = await createImageBitmap(file)
+      bitmap.close?.()
+      return true
+    }
+
+    // createImageBitmap이 없는 환경에서도 로컬 이미지를 실제로 열어 검증한다.
+    image = new Image()
+    objectUrl = URL.createObjectURL(file)
+    return await new Promise((resolve) => {
+      image.onload = () => resolve(image.naturalWidth > 0 && image.naturalHeight > 0)
+      image.onerror = () => resolve(false)
+      image.src = objectUrl
+    })
   } catch {
     return false
+  } finally {
+    if (image) {
+      image.onload = null
+      image.onerror = null
+    }
+    if (objectUrl) URL.revokeObjectURL(objectUrl)
   }
 }
 
