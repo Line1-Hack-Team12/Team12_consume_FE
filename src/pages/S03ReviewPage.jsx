@@ -16,6 +16,7 @@ import { isTransactionValid } from '../utils/transactionValidation'
 import { gateState, pendingQueue, reviewQueue } from './S03/reviewSelectors'
 
 const VISIBLE_QUEUE = 3
+const EXPAND_QUEUE_THRESHOLD = 5
 
 // S03 읽어온 숫자 확인 · 검토 큐를 모두 처리하면 같은 화면이 S03-R(확인 완료) 상태가 된다
 export default function S03ReviewPage() {
@@ -34,6 +35,9 @@ export default function S03ReviewPage() {
   const slots = Object.keys(summary.bySlot).sort()
   const queue = reviewQueue(draft)
   const pending = pendingQueue(draft)
+  // 전체 검토 대상 수로 판단해, 처리 중 남은 행이 줄어도 다시 접히지 않게 한다.
+  const visibleQueue = queue.length > EXPAND_QUEUE_THRESHOLD ? pending : pending.slice(0, VISIBLE_QUEUE)
+  const hiddenQueueCount = pending.length - visibleQueue.length
   const gate = gateState(draft, summary)
   const dupCount = draft.duplicateGroups.length
   const mergedCount = draft.duplicateGroups.filter((g) => g.decision === 'merge').length
@@ -107,7 +111,7 @@ export default function S03ReviewPage() {
             <Badge tone="coral">확인 필요</Badge>
           </div>
           <ul className="flex flex-col gap-2.5">
-            {pending.slice(0, VISIBLE_QUEUE).map((t) => (
+            {visibleQueue.map((t) => (
               <li key={t.id} className="flex flex-col gap-2.5 rounded-xl bg-canvas px-3.5 py-3">
                 <div className="flex items-center gap-2.5">
                   <div className="min-w-0 flex-1">
@@ -135,7 +139,7 @@ export default function S03ReviewPage() {
               </li>
             ))}
           </ul>
-          {pending.length > VISIBLE_QUEUE ? <p className="text-caption text-ink-3">처리하면 남은 {pending.length - VISIBLE_QUEUE}개가 이어서 보여요</p> : null}
+          {hiddenQueueCount > 0 ? <p className="text-caption text-ink-3">처리하면 남은 {hiddenQueueCount}개가 이어서 보여요</p> : null}
         </section>
       )}
 
