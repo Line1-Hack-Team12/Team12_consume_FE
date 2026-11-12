@@ -62,12 +62,13 @@ export default function SlotCard({ month, files, disabled, onAdd, onRemove }) {
       {rejected.length > 0 ? (
         <ul className="flex flex-col gap-1">
           {rejected.map((f) => (
-            <li key={f.id} className="flex items-center gap-1.5 text-caption text-warning-ink">
-              <Icon name="alert" size={14} />
-              <span className="min-w-0 flex-1 truncate">
-                {f.name} · {f.reason}
-              </span>
-              <button type="button" onClick={() => onRemove(month, f)} className="text-caption-m text-ink-3 underline">
+            <li key={f.id} className="flex items-start gap-1.5 text-caption text-warning-ink">
+              <Icon name="alert" size={14} className="mt-0.5" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate" title={f.name}>{f.name}</p>
+                <p className="whitespace-normal wrap-anywhere">{f.reason}</p>
+              </div>
+              <button type="button" onClick={() => onRemove(month, f)} aria-label={`${f.name} 지우기`} className="shrink-0 whitespace-nowrap text-caption-m text-ink-3 underline">
                 지우기
               </button>
             </li>
