@@ -32,7 +32,7 @@ export default function SlotCard({ month, files, disabled, onAdd, onRemove }) {
         <input id={inputId} type="file" accept={ACCEPT_ATTR} multiple className="peer sr-only" disabled={disabled || checking} onChange={handleChange} />
         <label
           htmlFor={inputId}
-          className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-caption-m peer-focus-visible:outline-2 peer-focus-visible:outline-brand ${
+          className={`inline-flex min-h-11 shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-caption-m peer-focus-visible:outline-2 peer-focus-visible:outline-brand ${
             disabled ? 'cursor-not-allowed bg-subtle text-ink-3' : 'cursor-pointer bg-brand-tint text-brand'
           }`}
         >
@@ -45,23 +45,24 @@ export default function SlotCard({ month, files, disabled, onAdd, onRemove }) {
       {accepted.length > 0 ? (
         <ul className="flex flex-wrap gap-2">
           {accepted.map((f) => (
-            <li key={f.id} className="relative size-[58px] overflow-hidden rounded-[10px] bg-subtle">
+            <li key={f.id} className="flex w-[58px] flex-col">
               <button
                 type="button"
                 onClick={() => setPreviewFileId(f.id)}
                 aria-label={`${f.name} 크게 보기`}
                 aria-haspopup="dialog"
-                className="block size-full rounded-[10px] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand"
+                className="block size-[58px] shrink-0 overflow-hidden rounded-[10px] bg-subtle focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand"
               >
                 <img src={f.url} alt={f.name} className="size-full object-cover" />
               </button>
               <button
                 type="button"
                 onClick={() => onRemove(month, f)}
-                className="absolute top-0.5 right-0.5 rounded-full bg-ink/70 p-0.5 text-white"
+                className="flex min-h-11 w-full items-center justify-center gap-1 rounded-lg text-caption-m text-ink-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand"
                 aria-label={`${f.name} 빼기`}
               >
                 <Icon name="close" size={12} />
+                삭제
               </button>
             </li>
           ))}
@@ -79,7 +80,7 @@ export default function SlotCard({ month, files, disabled, onAdd, onRemove }) {
                 <p className="truncate" title={f.name}>{f.name}</p>
                 <p className="whitespace-normal wrap-anywhere">{f.reason}</p>
               </div>
-              <button type="button" onClick={() => onRemove(month, f)} aria-label={`${f.name} 지우기`} className="shrink-0 whitespace-nowrap text-caption-m text-ink-3 underline">
+              <button type="button" onClick={() => onRemove(month, f)} aria-label={`${f.name} 지우기`} className="min-h-11 min-w-11 shrink-0 px-1 whitespace-nowrap text-caption-m text-ink-3 underline focus-visible:outline-2 focus-visible:outline-brand">
                 지우기
               </button>
             </li>
