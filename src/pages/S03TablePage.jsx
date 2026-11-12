@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import ScreenLayout from '../components/layout/ScreenLayout'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
@@ -17,9 +17,32 @@ const labelOf = (list, v) => list.find((x) => x.value === v)?.label ?? v
 
 // S03-T 전체 내역 수정하기 · 모바일은 행 카드, 날짜순 10건씩
 export default function S03TablePage() {
-  const { navigate, back } = useNavigation()
+  const { current, navigate, back, getViewState, saveViewState } = useNavigation()
   const { draft } = useAnalysisSession()
-  const [shown, setShown] = useState(PAGE)
+  const [shown, setShown] = useState(() => getViewState(current.key)?.shown ?? PAGE)
+  const listRef = useRef(null)
+  const hasDraft = Boolean(draft)
+
+  useLayoutEffect(() => {
+    if (!hasDraft) return
+    const saved = getViewState(current.key)
+    if (!saved) return
+    const anchor = Array.from(listRef.current?.children ?? []).find((row) => row.dataset.transactionId === String(saved.anchorId))
+    const top = anchor ? window.scrollY + anchor.getBoundingClientRect().top - saved.anchorOffset : saved.scrollY
+    window.scrollTo({ left: saved.scrollX, top, behavior: 'instant' })
+  }, [current.key, hasDraft, getViewState])
+
+  useEffect(() => {
+    if (!hasDraft) return undefined
+    const rememberPosition = () => {
+      // 이동 직후 발생한 이전 화면의 scroll 이벤트가 복귀 위치를 덮어쓰지 않게 한다.
+      if (window.history.state?.screen?.key !== current.key) return
+      saveViewState(current.key, { shown, scrollX: window.scrollX, scrollY: window.scrollY })
+    }
+    rememberPosition()
+    window.addEventListener('scroll', rememberPosition, { passive: true })
+    return () => window.removeEventListener('scroll', rememberPosition)
+  }, [current.key, hasDraft, shown, saveViewState])
 
   if (!draft) {
     return (
@@ -55,14 +78,14 @@ export default function S03TablePage() {
       }
     >
       <p className="text-caption text-ink-3">날짜 · 시각 · 가맹점 · 금액 · 방향 · 카테고리 · 포함 상태</p>
-      <ul className="flex flex-col gap-2.5">
+      <ul ref={listRef} className="flex flex-col gap-2.5">
         {rows.slice(0, shown).map((t) => {
           const excluded = !t.included
           const merged = mergedAway.has(t.id)
           const invalid = t.included && !isTransactionValid(t)
           const cat = [labelOf(CATEGORIES, t.category), t.subcategory].filter(Boolean).join('/')
           return (
-            <li key={t.id} className={`flex flex-col gap-2.5 rounded-2xl p-4 ${excluded ? 'bg-subtle' : 'bg-surface'}`}>
+            <li key={t.id} data-transaction-id={t.id} className={`flex flex-col gap-2.5 rounded-2xl p-4 ${excluded ? 'bg-subtle' : 'bg-surface'}`}>
               <div className="flex items-start gap-2">
                 <div className="min-w-0 flex-1">
                   <p className={`text-body-b ${excluded ? 'text-ink-3' : ''}`}>
@@ -84,7 +107,16 @@ export default function S03TablePage() {
                   <Badge tone="success">포함</Badge>
                 )}
               </div>
-              <Button size="md" variant="secondary" onClick={() => navigate(SCREEN.S03_E, { id: t.id })}>
+              <Button size="md" variant="secondary" onClick={(event) => {
+                saveViewState(current.key, {
+                  shown,
+                  scrollX: window.scrollX,
+                  scrollY: window.scrollY,
+                  anchorId: t.id,
+                  anchorOffset: event.currentTarget.closest('li').getBoundingClientRect().top,
+                })
+                navigate(SCREEN.S03_E, { id: t.id })
+              }}>
                 {excluded ? '복원 또는 수정' : '이 내역 수정'}
               </Button>
             </li>
