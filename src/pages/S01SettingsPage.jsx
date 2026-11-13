@@ -12,6 +12,8 @@ import { MONTH_COUNTS, PAYDAY_OPTIONS, REGIONS, TONES } from '../constants/limit
 import { SCREEN } from '../constants/screens'
 import { useAnalysisSession } from '../hooks/analysisSessionContext'
 import { useNavigation } from '../hooks/navigationContext'
+import { USE_MOCK } from '../api/config'
+import { createSession } from '../api/sessions'
 import { startExtractionJob } from '../mocks/jobs'
 import { buildSlots, formatMonth, getSelectableMonths, isSelectableLastMonth } from '../utils/months'
 import SlotCard from './S01/SlotCard'
@@ -37,10 +39,11 @@ function Section({ title, description, children }) {
 // S01 설정하고 캡처 올리기 (F01·F02)
 export default function S01SettingsPage() {
   const { navigate } = useNavigation()
-  const { settings, files, consent, updateSettings, addFiles, removeFile, setConsent } = useAnalysisSession()
+  const { settings, files, consent, updateSettings, addFiles, removeFile, setConsent, setSessionId } = useAnalysisSession()
   const [confirmEmpty, setConfirmEmpty] = useState(false)
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState('')
+  const [uploadError, setUploadError] = useState('')
 
   const monthOptions = useMemo(() => getSelectableMonths().map((m) => ({ value: m, label: formatMonth(m) })), [])
   const lastMonthValid = isSelectableLastMonth(settings.lastMonth)
@@ -68,10 +71,23 @@ export default function S01SettingsPage() {
       return
     }
     setStarting(true)
-    const assets = slots.flatMap((m, i) => acceptedBySlot[i].map((f) => ({ id: f.id, name: f.name, slotMonth: m })))
-    const { jobId } = await startExtractionJob({ assets, emptySlotAcknowledged: emptySlots })
-    setStarting(false)
-    navigate(SCREEN.S02, { jobId })
+    setUploadError('')
+    const assets = slots.flatMap((m, i) => acceptedBySlot[i].map((f) => ({ id: f.id, name: f.name, file: f.file, slotMonth: m })))
+    try {
+      if (USE_MOCK) {
+        const { jobId } = await startExtractionJob({ assets, emptySlotAcknowledged: emptySlots })
+        navigate(SCREEN.S02, { jobId })
+      } else {
+        // 동의 후에만 서버로 보낸다 (F02)
+        const sessionId = await createSession({ settings, assets })
+        setSessionId(sessionId)
+        navigate(SCREEN.S02, { sessionId })
+      }
+    } catch (err) {
+      setUploadError(err.message ?? '캡처를 보내지 못했어요. 다시 시도해 주세요.')
+    } finally {
+      setStarting(false)
+    }
   }
 
   const onStartClick = () => {
@@ -87,6 +103,11 @@ export default function S01SettingsPage() {
       footer={
         <>
           {blockReason ? <p className="text-center text-caption text-ink-3">{blockReason}</p> : null}
+          {uploadError ? (
+            <p role="alert" className="text-center text-caption text-danger-ink">
+              {uploadError}
+            </p>
+          ) : null}
           <Button disabled={Boolean(blockReason) || starting} onClick={onStartClick}>
             {starting ? '준비 중…' : `${acceptedCount}장 분석 시작`}
           </Button>

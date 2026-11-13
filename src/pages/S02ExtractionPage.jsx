@@ -10,7 +10,13 @@ import { SCREEN } from '../constants/screens'
 import { useAnalysisSession } from '../hooks/analysisSessionContext'
 import { useNavigation } from '../hooks/navigationContext'
 import useJobPolling from '../hooks/useJobPolling'
+import { toExtractionJob } from '../api/adapters'
+import { USE_MOCK } from '../api/config'
+import { getSessionStatus, proceedPartial, resetForReplace, retryFailedFiles } from '../api/sessions'
 import { getJob, retryFailedAssets } from '../mocks/jobs'
+
+// API 모드: 폴링 키는 'sessionId#시도번호' · 재시도하면 시도번호를 올려 폴링을 다시 시작한다
+const fetchSessionJob = (key) => getSessionStatus(key.split('#')[0]).then(toExtractionJob)
 
 const STAGES = [
   { key: 'reading', label: '캡처 읽기' },
@@ -39,10 +45,15 @@ const FILE_STATUS = {
 // S02 캡처를 읽고 있어요 · partial/failed는 같은 화면에서 E04 상태로 보여준다
 export default function S02ExtractionPage({ params }) {
   const { navigate } = useNavigation()
-  const { setDraft } = useAnalysisSession()
-  const [jobId, setJobId] = useState(params?.jobId ?? null)
+  const { setDraft, sessionId: contextSessionId, loadDraftFromServer } = useAnalysisSession()
+  const sessionId = params?.sessionId ?? (USE_MOCK ? null : contextSessionId)
+  const [mockJobId, setMockJobId] = useState(params?.jobId ?? null)
+  const [attempt, setAttempt] = useState(0)
   const [retrying, setRetrying] = useState(false)
-  const { job, error } = useJobPolling(jobId, getJob)
+  const [busy, setBusy] = useState(false)
+  const [actionError, setActionError] = useState('')
+  const jobId = USE_MOCK ? mockJobId : sessionId ? `${sessionId}#${attempt}` : null
+  const { job, error } = useJobPolling(jobId, USE_MOCK ? getJob : fetchSessionJob)
 
   if (!jobId) {
     return (
@@ -61,16 +72,53 @@ export default function S02ExtractionPage({ params }) {
   const stageIndex = finished ? STAGES.length : Math.max(0, STAGES.findIndex((s) => s.key === job?.stage))
   const progress = total ? (done / total) * 0.6 + (Math.max(0, stageIndex - 1) / (STAGES.length - 1)) * 0.4 : 0
 
-  const goReview = () => {
-    setDraft(job.result.draft)
-    navigate(SCREEN.S03, {}, { replace: true })
+  const goReview = async () => {
+    if (USE_MOCK) {
+      setDraft(job.result.draft)
+      navigate(SCREEN.S03, {}, { replace: true })
+      return
+    }
+    setBusy(true)
+    setActionError('')
+    try {
+      if (job.state === 'partial') await proceedPartial(sessionId)
+      await loadDraftFromServer(sessionId)
+      navigate(SCREEN.S03, {}, { replace: true })
+    } catch (err) {
+      setActionError(err.message)
+    } finally {
+      setBusy(false)
+    }
   }
 
   const retry = async () => {
     setRetrying(true)
-    const next = await retryFailedAssets(jobId)
-    setRetrying(false)
-    setJobId(next.jobId)
+    setActionError('')
+    try {
+      if (USE_MOCK) {
+        const next = await retryFailedAssets(mockJobId)
+        setMockJobId(next.jobId)
+      } else {
+        await retryFailedFiles(sessionId, failed.map((a) => a.assetId))
+        setAttempt((n) => n + 1)
+      }
+    } catch (err) {
+      setActionError(err.message)
+    } finally {
+      setRetrying(false)
+    }
+  }
+
+  const replace = async () => {
+    if (!USE_MOCK) {
+      try {
+        await resetForReplace(sessionId)
+      } catch (err) {
+        setActionError(err.message)
+        return
+      }
+    }
+    navigate(SCREEN.S01, {}, { replace: true })
   }
 
   // E04 일부 캡처를 읽지 못했어요 / 전체 실패
@@ -82,11 +130,12 @@ export default function S02ExtractionPage({ params }) {
         showBack={false}
         footer={
           <>
-            {!allFailed ? <Button onClick={goReview}>성공한 {succeeded}장으로 검토</Button> : null}
+            {actionError ? <p role="alert" className="text-center text-caption text-danger-ink">{actionError}</p> : null}
+            {!allFailed ? <Button disabled={busy} onClick={goReview}>{busy ? '불러오는 중…' : `성공한 ${succeeded}장으로 검토`}</Button> : null}
             <Button variant={allFailed ? 'primary' : 'secondary'} disabled={retrying} onClick={retry}>
               {retrying ? '다시 읽는 중…' : '실패한 파일만 다시 시도'}
             </Button>
-            <Button variant="secondary" onClick={() => navigate(SCREEN.S01, {}, { replace: true })}>
+            <Button variant="secondary" onClick={replace}>
               캡처 교체하기
             </Button>
           </>
@@ -126,9 +175,12 @@ export default function S02ExtractionPage({ params }) {
       description="보통 30초 안에 끝나요. 화면을 나가도 이어서 진행돼요."
       showBack={false}
       footer={
-        <Button disabled={!finished} onClick={goReview}>
-          {finished ? '읽어온 내역 확인하기' : '읽는 중…'}
-        </Button>
+        <>
+          {actionError ? <p role="alert" className="text-center text-caption text-danger-ink">{actionError}</p> : null}
+          <Button disabled={!finished || busy} onClick={goReview}>
+            {busy ? '불러오는 중…' : finished ? '읽어온 내역 확인하기' : '읽는 중…'}
+          </Button>
+        </>
       }
     >
       <section className="flex flex-col gap-3 rounded-[18px] bg-surface p-[18px]" aria-live="polite">

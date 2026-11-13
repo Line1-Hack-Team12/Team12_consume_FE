@@ -7,6 +7,9 @@ import { SCREEN } from '../constants/screens'
 import { useAnalysisSession } from '../hooks/analysisSessionContext'
 import { useNavigation } from '../hooks/navigationContext'
 import useJobPolling from '../hooks/useJobPolling'
+import { toAnalysisJob } from '../api/adapters'
+import { USE_MOCK } from '../api/config'
+import { getAnalysisStatus } from '../api/sessions'
 import { createMockAnalysis } from '../mocks/analysis'
 import { getJob, startAnalysisJob } from '../mocks/jobs'
 import { formatKRW } from '../utils/format'
@@ -17,17 +20,21 @@ const STAGES = [
   { key: 'explaining', label: '설명 문장 쓰기' },
 ]
 
+const fetchAnalysisJob = (key) => getAnalysisStatus(key.replace('analysis:', '')).then(toAnalysisJob)
+
 const TONE_LABEL = { coach: '코치', friend: '친구', grandma: '할머니' }
 
 // S03-P 확정 후 최종 분석 · snapshot으로만 분석하고 끝나면 S05로 간다
 export default function S03FinalizingPage() {
   const { navigate } = useNavigation()
   const { snapshot, settings, setAnalysis } = useAnalysisSession()
-  const [jobId, setJobId] = useState(null)
-  const { job, error } = useJobPolling(jobId, getJob)
+  const [mockJobId, setJobId] = useState(null)
+  // API 모드: 확정(POST /confirm) 뒤 GET /analysis/status 를 폴링한다
+  const jobId = USE_MOCK ? mockJobId : snapshot?.sessionId ? `analysis:${snapshot.sessionId}` : null
+  const { job, error } = useJobPolling(jobId, USE_MOCK ? getJob : fetchAnalysisJob)
 
   useEffect(() => {
-    if (!snapshot) return undefined
+    if (!snapshot || !USE_MOCK) return undefined
     let cancelled = false
     // TODO(API): 확정 snapshot을 분석하는 실제 서버 작업으로 교체한다. API 계약은 미정이다.
     startAnalysisJob({ snapshotId: snapshot.id }).then((r) => {
@@ -40,7 +47,8 @@ export default function S03FinalizingPage() {
 
   useEffect(() => {
     if (job?.state !== 'succeeded' || !snapshot) return
-    // 목업 job의 완료 결과다. 추출 중 임시 결과를 최종 분석에 재사용하지 않는다.
+    // 분석 완료 후 S05 결과는 아직 목업으로 만든다.
+    // TODO(API): S05 명세가 나오면 GET /api/analyses/{analysisId}/result 로 교체 (analysisId = sessionId)
     const scenario = new URLSearchParams(window.location.search).get('demo')
     setAnalysis(createMockAnalysis(snapshot, { scenario }))
     navigate(SCREEN.S05, {}, { replace: true })

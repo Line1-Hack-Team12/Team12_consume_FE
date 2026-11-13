@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from 'react'
+import { toDraft } from '../../api/adapters'
+import { USE_MOCK } from '../../api/config'
+import * as sessionApi from '../../api/sessions'
 import { DEFAULT_MONTH_COUNT, DEFAULT_TONE } from '../../constants/limits'
 import { AnalysisSessionContext } from '../../hooks/analysisSessionContext'
 import { createPatternResponseStore } from '../../mocks/patternResponses'
@@ -12,6 +15,8 @@ const initialState = {
   confirmed: false,
   snapshot: null,
   analysis: null,
+  sessionId: null, // 백엔드 세션 ID (API 모드)
+  syncError: null, // 서버 반영 실패 문구
 }
 
 function reducer(state, action) {
@@ -52,6 +57,10 @@ function reducer(state, action) {
     case 'analysis':
       if (action.analysis?.snapshotId !== state.snapshot?.id) return state
       return { ...state, analysis: action.analysis }
+    case 'sessionId':
+      return { ...state, sessionId: action.value }
+    case 'syncError':
+      return { ...state, syncError: action.value }
     default:
       return state
   }
@@ -93,6 +102,74 @@ export default function AnalysisSessionProvider({ children }) {
     dispatch({ type: 'removeFile', month, id: file.id })
   }, [])
 
+  // API 모드에서 서버 호출에 쓸 최신 상태
+  const stateRef = useRef(state)
+  useEffect(() => {
+    stateRef.current = state
+  })
+
+  const reportError = useCallback((err) => {
+    dispatch({ type: 'syncError', value: err?.message ?? '서버에 반영하지 못했어요. 다시 시도해 주세요.' })
+  }, [])
+
+  // S03-E·S03 검토 큐 처리 → PUT /api/transactions/{id}, 큐를 다 처리하면 POST /review/queue/confirm
+  const updateTransaction = useCallback(
+    (id, patch) => {
+      const before = stateRef.current.draft?.transactions.find((t) => t.id === id)
+      dispatch({ type: 'updateTransaction', id, patch })
+      if (USE_MOCK || !before?.serverId) return
+      const next = { ...before, ...patch }
+      const action = patch.included === false ? 'EXCLUDE' : patch.included === true && !before.included ? 'RESTORE' : patch.reviewStatus === 'kept' ? 'KEEP' : 'EDIT'
+      const sessionId = stateRef.current.sessionId
+      sessionApi
+        .updateTransaction(before.serverId, next, action)
+        .then(() => {
+          const rows = stateRef.current.draft?.transactions ?? []
+          const queue = rows.filter((t) => t.reviewReasons.length > 0)
+          if (queue.length > 0 && queue.every((t) => t.reviewStatus !== 'pending') && before.reviewStatus === 'pending') {
+            return sessionApi.confirmReviewQueue(sessionId, queue.map((t) => ({ transactionId: t.serverId, applySuggested: false })))
+          }
+          return null
+        })
+        .catch(reportError)
+    },
+    [reportError],
+  )
+
+  // E02 → POST /duplicates/resolve
+  const setDuplicateDecision = useCallback(
+    (id, decision) => {
+      const group = stateRef.current.draft?.duplicateGroups.find((g) => g.id === id)
+      dispatch({ type: 'duplicateDecision', id, decision })
+      if (USE_MOCK || group?.serverGroupId == null) return
+      sessionApi.resolveDuplicate(stateRef.current.sessionId, group.serverGroupId, decision === 'merge' ? 'SAME_TRANSACTION' : 'SEPARATE').catch(reportError)
+    },
+    [reportError],
+  )
+
+  // S03 확인 체크 → POST /review/check
+  const setConfirmed = useCallback(
+    (value) => {
+      dispatch({ type: 'confirmed', value })
+      if (USE_MOCK || !value || !stateRef.current.sessionId) return
+      sessionApi.checkReview(stateRef.current.sessionId).catch((err) => {
+        dispatch({ type: 'confirmed', value: false })
+        reportError(err)
+      })
+    },
+    [reportError],
+  )
+
+  // 추출이 끝난 뒤 서버의 거래 표를 불러와 draft로 만든다
+  const loadDraftFromServer = useCallback(async (sessionId) => {
+    const [list, review, duplicates] = await Promise.all([
+      sessionApi.getTransactions(sessionId),
+      sessionApi.getReview(sessionId),
+      sessionApi.getDuplicates(sessionId).catch(() => null),
+    ])
+    dispatch({ type: 'draft', draft: toDraft({ list, review, duplicates }) })
+  }, [])
+
   const actions = useMemo(
     () => ({
       updateSettings: (patch) => dispatch({ type: 'settings', patch }),
@@ -100,13 +177,18 @@ export default function AnalysisSessionProvider({ children }) {
       removeFile,
       setConsent: (value) => dispatch({ type: 'consent', value }),
       setDraft: (draft) => dispatch({ type: 'draft', draft }),
-      updateTransaction: (id, patch) => dispatch({ type: 'updateTransaction', id, patch }),
-      setDuplicateDecision: (id, decision) => dispatch({ type: 'duplicateDecision', id, decision }),
-      setConfirmed: (value) => dispatch({ type: 'confirmed', value }),
+      updateTransaction,
+      setDuplicateDecision,
+      setConfirmed,
       setSnapshot: (snapshot) => dispatch({ type: 'snapshot', snapshot }),
       setAnalysis: (analysis) => dispatch({ type: 'analysis', analysis }),
+      setSessionId: (value) => dispatch({ type: 'sessionId', value }),
+      clearSyncError: () => dispatch({ type: 'syncError', value: null }),
+      loadDraftFromServer,
+      // S03-R → POST /confirm (목업 모드에서는 바로 통과)
+      confirmReview: () => (USE_MOCK || !stateRef.current.sessionId ? Promise.resolve(null) : sessionApi.confirmSession(stateRef.current.sessionId)),
     }),
-    [addFiles, removeFile],
+    [addFiles, removeFile, updateTransaction, setDuplicateDecision, setConfirmed, loadDraftFromServer],
   )
 
   const value = useMemo(() => ({ ...state, ...actions, patternResponseStore, savingsPlanStore, selectedPlan }), [state, actions, patternResponseStore, savingsPlanStore, selectedPlan])

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import ScreenLayout from '../components/layout/ScreenLayout'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
@@ -21,7 +22,9 @@ const EXPAND_QUEUE_THRESHOLD = 5
 // S03 읽어온 숫자 확인 · 검토 큐를 모두 처리하면 같은 화면이 S03-R(확인 완료) 상태가 된다
 export default function S03ReviewPage() {
   const { navigate } = useNavigation()
-  const { draft, confirmed, setConfirmed, updateTransaction, setSnapshot } = useAnalysisSession()
+  const { draft, confirmed, setConfirmed, updateTransaction, setSnapshot, confirmReview, sessionId, syncError, clearSyncError } = useAnalysisSession()
+  const [confirming, setConfirming] = useState(false)
+  const [confirmError, setConfirmError] = useState('')
 
   if (!draft) {
     return (
@@ -52,10 +55,23 @@ export default function S03ReviewPage() {
   }
   const exclude = (t) => updateTransaction(t.id, { included: false, reviewStatus: 'excluded' })
 
-  const confirm = () => {
-    // TODO(API): POST /sessions/{sid}/snapshots { expected_revision, confirmation: true }
+  const confirm = async () => {
+    setConfirming(true)
+    setConfirmError('')
+    let serverSnapshotId
+    try {
+      // API 모드: POST /api/sessions/{sid}/confirm · 목업 모드에서는 바로 통과
+      const res = await confirmReview()
+      serverSnapshotId = res?.snapshotId ?? null
+    } catch (err) {
+      setConfirmError(err.message)
+      setConfirming(false)
+      return
+    }
+    setConfirming(false)
     setSnapshot({
-      id: `sn_${crypto.randomUUID()}`,
+      id: serverSnapshotId != null ? `sn_${serverSnapshotId}` : `sn_${crypto.randomUUID()}`,
+      sessionId,
       sourceRevision: draft.revision,
       summary,
       slots,
@@ -74,8 +90,9 @@ export default function S03ReviewPage() {
             건수와 합계를 확인했어요
           </Checkbox>
           {!gate.canConfirm ? <p className="text-caption text-ink-3">{gate.reason}</p> : null}
-          <Button disabled={!confirmed || !gate.canConfirm} onClick={confirm}>
-            계속 · 확정하고 분석
+          {confirmError ? <p role="alert" className="text-caption text-danger-ink">{confirmError}</p> : null}
+          <Button disabled={!confirmed || !gate.canConfirm || confirming} onClick={confirm}>
+            {confirming ? '확정하는 중…' : '계속 · 확정하고 분석'}
           </Button>
           {reviewDone ? (
             <Button variant="secondary" onClick={() => navigate(SCREEN.S03_T)}>
@@ -85,6 +102,14 @@ export default function S03ReviewPage() {
         </>
       }
     >
+      {syncError ? (
+        <Note tone="danger" icon="alert">
+          <p>{syncError}</p>
+          <button type="button" className="mt-1 text-caption-m underline" onClick={clearSyncError}>
+            닫기
+          </button>
+        </Note>
+      ) : null}
       <SummaryCard caption={`업로드한 ${formatSlotRange(slots)} 기록 기준 · 슬롯 ${slots.length}개`} amount={`${summary.expenseCount}건 · ${formatKRW(summary.expenseSum)}`} badge="검토 중" />
 
       {reviewDone ? (
