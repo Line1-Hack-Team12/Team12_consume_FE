@@ -6,6 +6,7 @@ import { DEFAULT_MONTH_COUNT, DEFAULT_TONE } from '../../constants/limits'
 import { buildSlots } from '../../utils/months'
 import { regenerateNarratives, savePatternResponse } from '../../api/analysis'
 import { saveTransactionEdit } from '../../api/transactionEdits'
+import { applyAnalysisNarratives } from '../../api/analysisRecovery'
 import { confirmReviewedDraft, fetchReviewDraft, ReviewConflictError } from '../../api/reviewConfirmation'
 import { recoverReviewDraft } from '../../utils/draftConflict'
 import { AnalysisSessionContext } from '../../hooks/analysisSessionContext'
@@ -87,7 +88,7 @@ function reducer(state, action) {
       return { ...state, snapshot: action.snapshot, analysis: null }
     case 'analysis':
       if (action.analysis?.snapshotId !== state.snapshot?.id) return state
-      return { ...state, analysis: action.analysis }
+      return { ...state, analysis: action.analysis, narrativeError: '' }
     case 'sessionId':
       return { ...state, sessionId: action.value }
     case 'syncError':
@@ -104,6 +105,7 @@ export default function AnalysisSessionProvider({ children }) {
   const [syncBusy, setSyncBusy] = useState(false)
   const [toneBusy, setToneBusy] = useState(false)
   const savingRef = useRef(false)
+  const narrativeSavingRef = useRef(false)
   const [patternResponseStore] = useState(() => createPatternResponseStore({ saveResponse: savePatternResponse }))
   const [savingsPlanStore] = useState(() => createSavingsPlanStore({ responseStore: patternResponseStore }))
   const selectedPlan = useSyncExternalStore(savingsPlanStore.subscribe, savingsPlanStore.getSelectedPlan, savingsPlanStore.getSelectedPlan)
@@ -134,18 +136,27 @@ export default function AnalysisSessionProvider({ children }) {
   const setTone = useCallback(async (tone) => {
     const current = stateRef.current.analysis
     if (current?.mode !== 'server') { dispatch({ type: 'settings', patch: { tone } }); return }
+    const isCurrent = () => stateRef.current.analysis?.snapshotId === current.snapshotId && stateRef.current.analysis?.analysisId === current.analysisId
+    if (narrativeSavingRef.current) return false
+    narrativeSavingRef.current = true
     setToneBusy(true)
     try {
       const response = await regenerateNarratives(current.analysisId, { coach: 'COACH', friend: 'FRIEND', grandma: 'GRANDMOTHER' }[tone])
-      if (stateRef.current.analysis?.snapshotId !== current.snapshotId) return
-      dispatch({ type: 'analysis', analysis: { ...current, summaryByTone: { ...current.summaryByTone, [tone]: response.overallComment }, patterns: current.patterns.map((pattern) => {
-        const copy = response.narratives?.find((n) => String(n.patternId) === pattern.id)
-        return copy ? { ...pattern, copyByTone: { ...pattern.copyByTone, [tone]: { observation: copy.observation, hypothesisQuestion: copy.hypothesisQuestion, action: copy.action } } } : pattern
-      }) } })
-      dispatch({ type: 'narrativeError', value: '' })
-    } catch {
-      dispatch({ type: 'narrativeError', value: '말투를 바꾸지 못해 기본 표현으로 보여드려요. 숫자와 근거는 그대로예요.' })
-    } finally { dispatch({ type: 'settings', patch: { tone } }); setToneBusy(false) }
+      const latest = stateRef.current.analysis
+      if (latest?.snapshotId !== current.snapshotId || latest?.analysisId !== current.analysisId) return false
+      const updated = applyAnalysisNarratives(latest, response, tone)
+      dispatch({ type: 'analysis', analysis: updated })
+      dispatch({ type: 'narrativeError', value: updated.recovery.narrativesIncomplete ? '설명을 모두 생성하지 못해 기존 문장이나 기본 표현을 보여드려요. 숫자와 근거는 그대로예요.' : '' })
+      return !updated.recovery.narrativesIncomplete
+    } catch (error) {
+      if (isCurrent()) {
+        dispatch({ type: 'narrativeError', value: error.message || '설명을 다시 만들지 못했어요. 숫자와 근거는 그대로예요.' })
+      }
+      return false
+    } finally {
+      if (isCurrent()) dispatch({ type: 'settings', patch: { tone } })
+      narrativeSavingRef.current = false; setToneBusy(false)
+    }
   }, [])
 
   // S03-E·S03 검토 큐 처리 → PUT /api/transactions/{id}, 큐를 다 처리하면 POST /review/queue/confirm

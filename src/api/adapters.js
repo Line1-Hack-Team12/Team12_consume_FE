@@ -81,8 +81,11 @@ export function toDraft({ list, review, duplicates }, { slots = [], assetSlots =
 
 export function toAnalysisJob(status) {
   const code = normalize(status.state ?? status.status)
-  const state = code === 'completed' || code === 'succeeded' ? 'succeeded' : code === 'failed' ? 'failed' : 'running'
+  const failedStep = (status.steps ?? []).find((s) => normalize(s.status) === 'failed')
+  const state = code === 'completed' || code === 'succeeded' ? 'succeeded' : code === 'failed' || failedStep ? 'failed' : 'running'
   const step = (status.steps ?? []).find((s) => s.status === 'IN_PROGRESS')?.stepNumber ?? status.currentStep ?? 1
+  const stages = ['final_aggregating', 'detecting', 'explaining']
   return { state, stage: status.stage ?? ['final_aggregating', 'detecting', 'explaining'][Math.min(3, Math.max(1, step)) - 1],
-    analysisId: status.analysisId, failureStage: status.failureStage, message: status.message ?? status.errorMessage }
+    analysisId: status.analysisId, snapshotId: status.snapshotId, sessionId: status.sessionId,
+    failureStage: status.failureStage ?? (state === 'failed' ? stages[(failedStep?.stepNumber ?? status.currentStep) - 1] ?? null : null), message: status.message ?? status.errorMessage }
 }

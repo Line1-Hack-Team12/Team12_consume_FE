@@ -1,9 +1,9 @@
 import { apiRequest } from './client.js'
 import { toNotificationRequest, toPatternResponseRequest, toPlanSelectionRequest } from './requestPayloads.js'
 
-export const getAnalysisResult = (id) => apiRequest(`/api/analyses/${id}/result`)
-export const getPatternDetail = (analysisId, patternId) => apiRequest(`/api/analyses/${analysisId}/patterns/${patternId}`)
-export const getReport = (sessionId) => apiRequest(`/api/sessions/${sessionId}/report`)
+export const getAnalysisResult = (id, opts) => apiRequest(`/api/analyses/${id}/result`, opts)
+export const getPatternDetail = (analysisId, patternId, opts) => apiRequest(`/api/analyses/${analysisId}/patterns/${patternId}`, opts)
+export const getReport = (sessionId, opts) => apiRequest(`/api/sessions/${sessionId}/report`, opts)
 export const regenerateNarratives = (analysisId, persona) => apiRequest(`/api/analyses/${analysisId}/narratives`, { method: 'POST', json: { persona } })
 export const getSavingsPlans = (sessionId, targetAmount, excludeCategories) => apiRequest(`/api/sessions/${sessionId}/savings-plans`, { query: { targetAmount, excludeCategories } })
 export const selectSavingsPlan = (sessionId, plan, targetAmount) => apiRequest(`/api/sessions/${sessionId}/savings-plans/select`, { method: 'POST', json: toPlanSelectionRequest(plan, targetAmount) })
