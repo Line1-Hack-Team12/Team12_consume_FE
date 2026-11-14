@@ -5,11 +5,12 @@ import { formatKRW } from '../../utils/format'
 
 export default function CostBreakdownCard({ pattern }) {
   const hasBreakdown = Number.isFinite(pattern.directMonthlyKrw) && Number.isFinite(pattern.chainedMonthlyKrw)
+  const prefix = pattern.amountLabel === '기간 합계' ? '기간 합계 ' : '월 '
 
   return (
     <Card padding="lg" className="flex flex-col gap-3">
       <h2 className="text-caption-m text-ink-2">진짜 비용</h2>
-      <p className="text-display break-words">월 {formatKRW(pattern.monthlyAmountKrw)}</p>
+      <p className="text-display break-words">{prefix}{formatKRW(pattern.monthlyAmountKrw)}</p>
       {hasBreakdown ? (
         <>
           <div className="flex h-2.5 gap-0.5 overflow-clip rounded-full bg-subtle" role="img" aria-label={`직접 비용 ${formatKRW(pattern.directMonthlyKrw)}, 후속 비용 ${formatKRW(pattern.chainedMonthlyKrw)}`}>
@@ -27,7 +28,7 @@ export default function CostBreakdownCard({ pattern }) {
                   <span className="block text-body-b">{item.label}</span>
                   <span className="block text-caption text-ink-3">{item.description}</span>
                 </dt>
-                <dd className="shrink-0 text-body-b">월 {formatKRW(item.amount)}</dd>
+                <dd className="shrink-0 text-body-b">{prefix}{formatKRW(item.amount)}</dd>
               </div>
             ))}
           </dl>

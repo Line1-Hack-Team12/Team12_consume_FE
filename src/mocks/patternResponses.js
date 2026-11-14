@@ -6,9 +6,9 @@ const ALLOWED_TAGS = CAUSE_TAGS.map((item) => item.value)
 
 export function createInitialPatternResponse(pattern, { designPreview = false } = {}) {
   const suggestion = pattern?.reminderSuggestion
-  const seed = designPreview ? pattern?.initialResponse : null
+  const seed = designPreview || pattern?.mode === 'server' ? pattern?.initialResponse : null
   return {
-    revision: 0,
+    revision: seed?.revision ?? 0,
     response_status: seed?.response_status ?? 'unanswered',
     cause_tags: [...(seed?.cause_tags ?? [])],
     custom_cause: seed?.custom_cause ?? '',
@@ -84,7 +84,7 @@ function initialRecord(response) {
 }
 
 // Provider마다 하나씩 생성한다. 원인 응답은 브라우저 영구 저장소·모듈 전역에 보관하지 않는다.
-export function createPatternResponseStore() {
+export function createPatternResponseStore({ saveResponse } = {}) {
   const entries = new Map()
   const listeners = new Set()
   const pending = new Map()
@@ -159,7 +159,9 @@ export function createPatternResponseStore() {
           const fail = failureMode && !failedOnce.has(failureKey) ? failureMode : null
           if (fail) failedOnce.add(failureKey)
           try {
-            const outcome = await saveMockPatternResponse({ current: entry.saved, replacement: entry.draft, expectedRevision: entry.saved.revision, pattern, failureMode: fail })
+            const transport = pattern.mode === 'server' ? saveResponse : saveMockPatternResponse
+            if (!transport) throw responseError('응답 저장 연결을 확인해 주세요.')
+            const outcome = await transport({ current: entry.saved, replacement: entry.draft, expectedRevision: entry.saved.revision, pattern, failureMode: fail })
               .then((saved) => ({ saved }), (error) => ({ error }))
             const latest = entries.get(key)
             // 로컬 해제 뒤의 이전 응답(성공·실패 모두)은 버린다. 다시 켠 경우도 최신 입력만 저장한다.

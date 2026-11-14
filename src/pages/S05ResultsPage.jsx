@@ -21,7 +21,7 @@ import PatternCard from './S05/PatternCard'
 // S05 결과 홈 (F10·F12·F16). 실제 결과는 확정 snapshot과 연결된 analysis만 사용한다.
 export default function S05ResultsPage() {
   const { navigate } = useAppNavigation()
-  const { settings, snapshot, analysis, updateSettings } = useAnalysisSession()
+  const { settings, snapshot, analysis, updateSettings, setTone, toneBusy, narrativeError } = useAnalysisSession()
   const [lockedPattern, setLockedPattern] = useState(null)
   const designPreview = import.meta.env.DEV && new URLSearchParams(window.location.search).get('demo') === 's05'
   const result = designPreview ? S05_PREVIEW_ANALYSIS : snapshot && analysis?.snapshotId === snapshot.id ? analysis : null
@@ -31,7 +31,7 @@ export default function S05ResultsPage() {
       <ScreenLayout
         showBack={false}
         title="아직 분석 결과가 없어요"
-        footer={<Button onClick={() => navigate(snapshot ? SCREEN.S03_P : SCREEN.S01, {}, { replace: true })}>{snapshot ? '최종 분석 이어가기' : '캡처 올리러 가기'}</Button>}
+        footer={<Button onClick={() => navigate(snapshot ? SCREEN.S03_P : SCREEN.S01, {}, { replace: true })}>{snapshot ? '최종 분석 이어가기' : '파일 올리러 가기'}</Button>}
       >
         <Note>업로드한 기록을 검토하고 확정하면 이곳에서 분석 결과를 볼 수 있어요.</Note>
       </ScreenLayout>
@@ -85,11 +85,12 @@ export default function S05ResultsPage() {
 
       <div className="flex flex-wrap gap-2" role="group" aria-label="말투">
         {TONES.map((item) => (
-          <Chip key={item.value} showCheck={false} selected={tone === item.value} onClick={() => updateSettings({ tone: item.value })}>
+          <Chip key={item.value} disabled={toneBusy} showCheck={false} selected={tone === item.value} onClick={() => setTone(item.value)}>
             {item.label}
           </Chip>
         ))}
       </div>
+      {narrativeError ? <Note tone="warn">{narrativeError}<Button size="sm" variant="secondary" disabled={toneBusy} onClick={() => setTone(tone)}>말투 다시 불러오기</Button></Note> : null}
 
       <Button variant="secondary" onClick={() => navigate(SCREEN.S08, { snapshotId: result.snapshotId })}>리포트 상세 →</Button>
 

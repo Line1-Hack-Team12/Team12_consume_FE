@@ -52,6 +52,7 @@ export default function S05PatternDetailPage({ params }) {
   }
 
   const action = pattern.copyByTone?.[tone]?.action ?? pattern.copyByTone?.coach?.action ?? '다음 소비 전에 한 번 더 확인해 보세요.'
+  const nextPattern = result.patterns[result.patterns.findIndex((item) => item.id === pattern.id) + 1]
 
   return (
     <ScreenLayout
@@ -61,6 +62,11 @@ export default function S05PatternDetailPage({ params }) {
       backIcon={<img src={back} width={24} height={24} alt="" className="block" />}
       footer={
         <>
+          {nextPattern ? <Button disabled={leaving || saving} onClick={async () => {
+            setLeaving(true)
+            try { if (await save()) navigate(SCREEN.S05_1, { snapshotId: result.snapshotId, patternId: nextPattern.id }) }
+            finally { setLeaving(false) }
+          }}>다음 카드</Button> : null}
           <Button disabled={leaving} onClick={() => leave(SCREEN.S09)}>적금 플랜으로</Button>
           <Button variant="secondary" disabled={leaving} onClick={() => leave(SCREEN.S05)}>결과 홈으로</Button>
         </>
@@ -100,7 +106,7 @@ export default function S05PatternDetailPage({ params }) {
 
       <ReminderCard key={`reminder-${pattern.id}`} pattern={pattern} tone={tone} response={response} onToggle={setReminderEnabled} />
       <p className="text-micro text-ink-3">
-        {designPreview ? '디자인 미리보기 · Figma의 예시 데이터예요.' : '데모 결과 · 확정한 예시 거래를 사용해요.'} 응답은 현재 세션에서 유지되며, 실제 푸시 발송은 연결되지 않았어요.
+        {designPreview ? '디자인 미리보기 · Figma의 예시 데이터예요.' : result.mode === 'server' ? '확정한 기록의 서버 분석 결과예요. 응답은 서버에 저장돼요.' : '데모 결과 · 응답은 현재 세션에서 유지돼요.'} 실제 푸시는 발송하지 않아요.
       </p>
     </ScreenLayout>
   )

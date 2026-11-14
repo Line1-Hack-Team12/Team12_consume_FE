@@ -11,6 +11,7 @@ import { useAnalysisSession } from '../hooks/analysisSessionContext'
 import { useAppNavigation } from '../hooks/navigationContext'
 import { formatNumber } from '../utils/format'
 import { validateTransaction } from '../utils/transactionValidation'
+import { buildSlots, formatMonth } from '../utils/months'
 
 function lastDay(month) {
   const [y, m] = month.split('-').map(Number)
@@ -20,7 +21,7 @@ function lastDay(month) {
 // S03-E 내역 수정하기
 export default function S03EditPage({ params }) {
   const { back } = useAppNavigation()
-  const { draft, updateTransaction } = useAnalysisSession()
+  const { draft, settings, updateTransaction, syncBusy, syncError } = useAnalysisSession()
   const original = draft?.transactions.find((t) => t.id === params?.id)
   const [form, setForm] = useState(() => (original ? { ...original, amountText: formatNumber(original.amountKrw) } : null))
   const [showErrors, setShowErrors] = useState(false)
@@ -62,35 +63,32 @@ export default function S03EditPage({ params }) {
     back(SCREEN.S03)
   }
 
-  const save = () => {
+  const save = async () => {
     if (hasErrors) {
       setShowErrors(true)
       return
     }
     const rest = { ...candidate }
     delete rest.amountText
-    updateTransaction(original.id, { ...rest, included: true, reviewStatus: original.reviewReasons.length ? 'edited' : original.reviewStatus })
-    done()
+    if (await updateTransaction(original.id, { ...rest, included: true, reviewStatus: original.reviewReasons.length ? 'edited' : original.reviewStatus })) done()
   }
 
-  const keepAsIs = () => {
+  const keepAsIs = async () => {
     // 포함 행의 필수값 오류는 그대로 두기로 통과시키지 않는다
     if (Object.keys(validateTransaction(original)).length > 0) {
       setShowErrors(true)
       return
     }
-    updateTransaction(original.id, { reviewStatus: original.reviewReasons.length ? 'kept' : original.reviewStatus })
-    done()
+    if (await updateTransaction(original.id, { reviewStatus: original.reviewReasons.length ? 'kept' : original.reviewStatus })) done()
   }
 
-  const toggleExclude = () => {
-    if (original.included) updateTransaction(original.id, { included: false, reviewStatus: 'excluded' })
-    else updateTransaction(original.id, { included: true, reviewStatus: original.reviewReasons.length ? 'pending' : 'ok' })
-    done()
+  const toggleExclude = async () => {
+    const patch = original.included ? { included: false, reviewStatus: 'excluded' } : { included: true, reviewStatus: original.reviewReasons.length ? 'pending' : 'ok' }
+    if (await updateTransaction(original.id, patch)) done()
   }
 
   const err = (k) => (showErrors ? errors[k] : undefined)
-  const [y, m] = original.slotMonth.split('-')
+  const [y, m] = (form.slotMonth || '').split('-')
 
   return (
     <ScreenLayout
@@ -99,13 +97,14 @@ export default function S03EditPage({ params }) {
       contentClassName="gap-3.5"
       footer={
         <>
-          <Button onClick={save}>수정 저장 · 내역 확인</Button>
+          {syncError ? <p role="alert" className="text-caption text-danger-ink">{syncError}</p> : null}
+          <Button disabled={syncBusy} onClick={save}>{syncBusy ? '저장 중…' : '수정 저장 · 내역 확인'}</Button>
           {original.included ? (
-            <Button variant="secondary" onClick={keepAsIs}>
+            <Button disabled={syncBusy} variant="secondary" onClick={keepAsIs}>
               그대로 두기 · 내역 확인
             </Button>
           ) : null}
-          <Button variant="secondary" onClick={toggleExclude}>
+          <Button disabled={syncBusy} variant="secondary" onClick={toggleExclude}>
             {original.included ? '이 내역 제외' : '이 내역 복원'}
           </Button>
         </>
@@ -114,12 +113,15 @@ export default function S03EditPage({ params }) {
       <p className="-mt-3 text-caption text-ink-3">
         <span className="text-danger">*</span> 표시는 필수 항목이에요. 시각은 비워둘 수 있어요.
       </p>
+      <SelectField label="기록의 달" required value={form.slotMonth || ''} placeholder="해당하는 달을 골라주세요"
+        options={buildSlots(settings.lastMonth, settings.monthCount).map((value) => ({ value, label: formatMonth(value) }))}
+        onChange={(e) => set({ slotMonth: e.target.value })} />
       <TextField
         label="날짜"
         required
         type="date"
-        min={`${y}-${m}-01`}
-        max={`${y}-${m}-${lastDay(original.slotMonth)}`}
+        min={m ? `${y}-${m}-01` : undefined}
+        max={m ? `${y}-${m}-${lastDay(form.slotMonth)}` : undefined}
         value={form.date}
         onChange={(e) => set({ date: e.target.value })}
         error={err('date')}

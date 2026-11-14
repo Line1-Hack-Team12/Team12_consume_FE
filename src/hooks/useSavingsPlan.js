@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
 import { DEFAULT_PLAN_GOAL_KRW, MAX_PLAN_GOAL_KRW, MIN_PLAN_GOAL_KRW } from '../constants/plans'
 import { createMockPlanModel } from '../mocks/plans'
+import useServerSavingsPlan from './useServerSavingsPlan'
 import { useAnalysisSession } from './analysisSessionContext'
 
 export default function useSavingsPlan({ result, designPreview = false }) {
   const { snapshot, analysis, savingsPlanStore: store } = useAnalysisSession()
+  const server = useServerSavingsPlan({ enabled: result?.mode === 'server', sessionId: snapshot?.sessionId, result })
   const preview = import.meta.env.DEV && designPreview
   const valid = Boolean(result && (preview || (snapshot?.id === result.snapshotId && analysis?.snapshotId === result.snapshotId)))
   const model = useMemo(() => valid ? createMockPlanModel({ snapshot, analysis: result, designPreview: preview }) : null, [valid, snapshot, result, preview])
@@ -24,6 +26,8 @@ export default function useSavingsPlan({ result, designPreview = false }) {
   const selectedDraft = plans.find((plan) => plan.id === entry.selectedPlanId)
   const maxPossibleKrw = response?.maxPossibleKrw ?? 0
   const impossibleExampleReason = maxPossibleKrw >= MAX_PLAN_GOAL_KRW ? '월 50만 원 범위에서는 달성 불가 예시가 없어요.' : ''
+
+  if (result?.mode === 'server') return server
 
   return {
     goalKrw: entry.goalKrw,

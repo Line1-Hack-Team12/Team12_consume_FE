@@ -34,7 +34,7 @@ export default function SavingsPlanCard({ plan, selected, disabled, onSelect }) 
               <div className="min-w-0 flex-1">
                 <p className="text-body-m">{item.kind === 'recurring' ? '구독 해지 제안' : item.label}</p>
                 <p className="text-caption text-ink-3">
-                  {item.kind === 'recurring' ? item.label : `월 ${item.beforeCount}회 → ${item.afterCount}회`}
+                  {item.kind === 'recurring' ? item.label : Number.isFinite(item.beforeCount) && Number.isFinite(item.afterCount) ? `월 ${item.beforeCount}회 → ${item.afterCount}회` : item.description ?? '감축 횟수 자료가 아직 없어요'}
                 </p>
               </div>
               <p className="shrink-0 text-body-b text-success">−{formatKRW(item.monthlySavingsKrw)}</p>

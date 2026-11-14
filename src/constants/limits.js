@@ -4,9 +4,12 @@ export const DEFAULT_MONTH_COUNT = 3
 export const SELECTABLE_MONTH_RANGE = 12 // 마지막 달 드롭다운에 보여줄 과거 개월 수
 
 export const MAX_FILES_PER_UPLOAD = 10
-export const MAX_FILE_BYTES = 10 * 1024 * 1024
-export const ACCEPTED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp']
-export const ACCEPT_ATTR = ACCEPTED_MIME_TYPES.join(',')
+export const MAX_FILE_BYTES = 10 * 1024 * 1024 // 보조 캡처
+export const MAX_BANK_FILE_BYTES = 20 * 1024 * 1024
+export const IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+export const IMAGE_ACCEPT_ATTR = '.jpg,.jpeg,.png,.webp,' + IMAGE_MIME_TYPES.join(',')
+export const BANK_FILE_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+export const BANK_ACCEPT_ATTR = `.xlsx,${BANK_FILE_MIME}`
 
 export const TIME_ZONE = 'Asia/Seoul'
 
@@ -34,7 +37,7 @@ export const CATEGORIES = [
   { value: 'shopping', label: '쇼핑', subs: ['온라인', '오프라인'] },
   { value: 'transport', label: '교통', subs: ['택시', '대중교통'] },
   { value: 'living', label: '생활', subs: ['편의점', '구독', '주거·통신', '의료'] },
-  { value: 'other', label: '기타', subs: ['이체'] },
+  { value: 'other', label: '기타', subs: ['이체', '여가', '차량', '미분류'] },
 ]
 
 export const DIRECTIONS = [
@@ -47,6 +50,7 @@ export const KINDS = [
   { value: 'expense', label: '지출' },
   { value: 'income', label: '수입' },
   { value: 'transfer', label: '이체' },
+  { value: 'self_transfer', label: '본인 계좌 이동' },
   { value: 'refund', label: '환불' },
   { value: 'cancel', label: '취소' },
   { value: 'unknown', label: '모름' },

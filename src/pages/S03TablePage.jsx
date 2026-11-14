@@ -11,6 +11,7 @@ import { summarizeDraft } from '../mocks/draft'
 import { formatKRW, formatShortDate } from '../utils/format'
 import { formatSlotRange } from '../utils/months'
 import { isTransactionValid } from '../utils/transactionValidation'
+import { expenseImpact } from '../utils/transactions'
 
 const PAGE = 10
 const labelOf = (list, v) => list.find((x) => x.value === v)?.label ?? v
@@ -51,7 +52,7 @@ export default function S03TablePage() {
   if (!draft) {
     return (
       <ScreenLayout title="표가 아직 없어요" backFallback={SCREEN.S03}>
-        <Note tone="gray">캡처를 읽은 뒤에 전체 표를 볼 수 있어요.</Note>
+        <Note tone="gray">파일을 읽은 뒤에 전체 표를 볼 수 있어요.</Note>
       </ScreenLayout>
     )
   }
@@ -105,7 +106,9 @@ export default function S03TablePage() {
                   <Badge>제외됨</Badge>
                 ) : merged ? (
                   <Badge tone="brand">중복 합침</Badge>
-                ) : t.direction !== 'out' || t.kind !== 'expense' ? (
+                ) : expenseImpact(t) < 0 ? (
+                  <Badge>지출 차감</Badge>
+                ) : expenseImpact(t) === 0 ? (
                   <Badge>지출 아님</Badge>
                 ) : (
                   <Badge tone="success">포함</Badge>
@@ -133,7 +136,7 @@ export default function S03TablePage() {
           다음 {Math.min(PAGE, rows.length - shown)}건 보기
         </Button>
       ) : null}
-      <Note tone="gray">날짜순으로 정렬했어요. 원본 이미지는 확정 전까지만 확인할 수 있어요.</Note>
+      <Note tone="gray">날짜순으로 정렬했어요. 파일에서 읽은 내역을 확인하고 수정할 수 있어요.</Note>
     </ScreenLayout>
   )
 }

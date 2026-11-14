@@ -1,4 +1,4 @@
-import { isTransactionValid } from '../../utils/transactionValidation'
+import { isTransactionValid } from '../../utils/transactionValidation.js'
 
 // S03 검토 게이트 계산 (F04·F06)
 
@@ -25,8 +25,8 @@ export function gateState(draft, summary) {
     ? `확인이 필요한 내역 ${pending}개를 먼저 처리해 주세요`
     : invalid
       ? `필수값이 빠진 내역 ${invalid}개를 고쳐주세요`
-      : summary.expenseCount === 0
-        ? '분석할 지출이 1건 이상 있어야 해요'
+      : summary.validCount === 0
+        ? '확정할 거래가 1건 이상 있어야 해요'
         : ''
   return { canConfirm: !reason, reason, pending, invalid }
 }

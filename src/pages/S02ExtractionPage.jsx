@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ScreenLayout from '../components/layout/ScreenLayout'
-import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
-import Icon from '../components/ui/Icon'
+import ConfirmDialog from '../components/ui/ConfirmDialog'
+import { TextField } from '../components/ui/Field'
 import Note from '../components/ui/Note'
 import ProgressBar from '../components/ui/ProgressBar'
 import Stepper from '../components/ui/Stepper'
@@ -12,211 +12,148 @@ import { useAppNavigation } from '../hooks/navigationContext'
 import useJobPolling from '../hooks/useJobPolling'
 import { toExtractionJob } from '../api/adapters'
 import { USE_MOCK } from '../api/config'
-import { getSessionStatus, proceedPartial, resetForReplace, retryFailedFiles } from '../api/sessions'
+import { CAN_RETRY_WITH_FILES, getSessionStatus, proceedPartial, resetForReplace, retryFailedFiles } from '../api/sessions'
 import { getJob, retryFailedAssets } from '../mocks/jobs'
+import { buildSlots, formatMonth } from '../utils/months'
 
-// API 모드: 폴링 키는 'sessionId#시도번호' · 재시도하면 시도번호를 올려 폴링을 다시 시작한다
 const fetchSessionJob = (key) => getSessionStatus(key.split('#')[0]).then(toExtractionJob)
+const STAGES = ['내역 읽기', '가맹점 분류', '중복 정리', '패턴 후보 찾기']
+const KEYS = ['reading', 'classifying', 'deduplicating', 'preliminary_detecting']
+const STATUS = { succeeded: '완료', failed: '읽기 실패', skipped: '거래가 없어 건너뜀', queued: '대기', running: '읽는 중' }
 
-const STAGES = [
-  { key: 'reading', label: '캡처 읽기' },
-  { key: 'classifying', label: '가맹점 분류' },
-  { key: 'deduplicating', label: '중복 정리' },
-  { key: 'preliminary_detecting', label: '패턴 후보 찾기' },
-]
-
-function stageSteps(job) {
-  const finished = job && ['succeeded', 'partial'].includes(job.state)
-  const current = finished ? STAGES.length : Math.max(0, STAGES.findIndex((s) => s.key === job?.stage))
-  return STAGES.map((s, i) => ({
-    label: s.label,
-    status: i < current ? 'done' : i === current ? 'run' : 'todo',
-    description: i === current ? '진행 중' : undefined,
-  }))
-}
-
-const FILE_STATUS = {
-  succeeded: { icon: 'check', color: 'text-success', text: '완료' },
-  running: { icon: 'image', color: 'text-brand', text: '읽는 중' },
-  queued: { icon: 'image', color: 'text-ink-3', text: '대기' },
-  failed: { icon: 'alert', color: 'text-coral', text: '실패' },
-}
-
-// S02 캡처를 읽고 있어요 · partial/failed는 같은 화면에서 E04 상태로 보여준다
 export default function S02ExtractionPage({ params }) {
   const { navigate } = useAppNavigation()
-  const { setDraft, sessionId: contextSessionId, loadDraftFromServer } = useAnalysisSession()
-  const sessionId = params?.sessionId ?? (USE_MOCK ? null : contextSessionId)
-  const [mockJobId, setMockJobId] = useState(params?.jobId ?? null)
+  const { settings, files, bankFiles, consent, setDraft, sessionId: contextId, loadDraftFromServer } = useAnalysisSession()
+  const sessionId = params?.sessionId ?? contextId
+  const [mockJobId, setMockJobId] = useState(params?.jobId)
   const [attempt, setAttempt] = useState(0)
-  const [retrying, setRetrying] = useState(false)
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState('')
+  const [emptyMonths, setEmptyMonths] = useState([])
+  const [noRows, setNoRows] = useState(false)
+  const [passwords, setPasswords] = useState({})
+  const reviewStarted = useRef(null)
+  const retrying = useRef(false)
+  const autoRetries = useRef(0)
+  const autoJob = useRef(null)
   const jobId = USE_MOCK ? mockJobId : sessionId ? `${sessionId}#${attempt}` : null
   const { job, error } = useJobPolling(jobId, USE_MOCK ? getJob : fetchSessionJob)
-
-  if (!jobId) {
-    return (
-      <ScreenLayout title="진행 중인 작업이 없어요" footer={<Button onClick={() => navigate(SCREEN.S01, {}, { replace: true })}>설정으로 돌아가기</Button>}>
-        <Note tone="gray">새로고침하면 진행 상태를 다시 불러와야 해요. 서버 연동 후에는 job ID로 이어서 볼 수 있어요.</Note>
-      </ScreenLayout>
-    )
+  const assets = job?.perAsset ?? []
+  const failed = assets.filter((a) => a.status === 'failed')
+  const succeeded = assets.filter((a) => a.status === 'succeeded').length
+  const finished = job && ['succeeded', 'partial', 'failed', 'no_transactions'].includes(job.state)
+  const slots = buildSlots(settings.lastMonth, settings.monthCount)
+  const originals = useMemo(() => [...bankFiles, ...Object.entries(files).flatMap(([slotMonth, list]) => list.map((f) => ({ ...f, slotMonth })))], [bankFiles, files])
+  const originalFor = (asset) => {
+    const matches = originals.filter((f) => f.name === asset.name && f.status === 'accepted')
+    return matches.length === 1 ? matches[0] : null
   }
 
-  const perAsset = job?.perAsset ?? []
-  const total = perAsset.length
-  const done = perAsset.filter((a) => a.status === 'succeeded' || a.status === 'failed').length
-  const succeeded = perAsset.filter((a) => a.status === 'succeeded').length
-  const failed = perAsset.filter((a) => a.status === 'failed')
-  const finished = job && ['succeeded', 'partial', 'failed'].includes(job.state)
-  const stageIndex = finished ? STAGES.length : Math.max(0, STAGES.findIndex((s) => s.key === job?.stage))
-  const progress = total ? (done / total) * 0.6 + (Math.max(0, stageIndex - 1) / (STAGES.length - 1)) * 0.4 : 0
-
-  const goReview = async () => {
-    if (USE_MOCK) {
-      setDraft(job.result.draft)
-      navigate(SCREEN.S03, {}, { replace: true })
-      return
-    }
-    setBusy(true)
-    setActionError('')
+  const goReview = useCallback(async () => {
+    setBusy(true); setActionError('')
     try {
-      if (job.state === 'partial') await proceedPartial(sessionId)
-      await loadDraftFromServer(sessionId)
-      navigate(SCREEN.S03, {}, { replace: true })
-    } catch (err) {
-      setActionError(err.message)
-    } finally {
-      setBusy(false)
-    }
-  }
+      if (!USE_MOCK && job.state === 'partial') await proceedPartial(sessionId)
+      const draft = USE_MOCK ? job.result?.draft : await loadDraftFromServer(sessionId)
+      if (!draft?.transactions?.length) { setNoRows(true); return }
+      const next = { ...draft, skippedCount: job.perAsset.filter((a) => a.status === 'skipped').length, failedCount: job.perAsset.filter((a) => a.status === 'failed').length }
+      setDraft(next)
+      const selected = buildSlots(settings.lastMonth, settings.monthCount)
+      const covered = new Set(next.transactions.map((t) => t.slotMonth || t.date?.slice(0, 7)))
+      const empty = selected.filter((month) => !covered.has(month))
+      if (bankFiles.some((f) => f.status === 'accepted') && empty.length) setEmptyMonths(empty)
+      else navigate(SCREEN.S03, {}, { replace: true })
+    } catch (err) { setActionError(err.message) }
+    finally { setBusy(false) }
+  }, [job, sessionId, settings.lastMonth, settings.monthCount, bankFiles, loadDraftFromServer, navigate, setDraft])
 
-  const retry = async () => {
-    setRetrying(true)
-    setActionError('')
+  useEffect(() => {
+    if (job?.state !== 'succeeded' || reviewStarted.current === jobId) return
+    reviewStarted.current = jobId
+    goReview()
+  }, [job?.state, jobId, goReview])
+
+  const retry = useCallback(async (automatic = false) => {
+    if (retrying.current) return
+    retrying.current = true; setBusy(true); setActionError('')
     try {
-      if (USE_MOCK) {
-        const next = await retryFailedAssets(mockJobId)
-        setMockJobId(next.jobId)
-      } else {
-        await retryFailedFiles(sessionId, failed.map((a) => a.assetId))
+      if (USE_MOCK) setMockJobId((await retryFailedAssets(mockJobId)).jobId)
+      else {
+        const all = [...bankFiles, ...Object.entries(files).flatMap(([slotMonth, list]) => list.map((f) => ({ ...f, slotMonth })))]
+        for (const asset of job.perAsset.filter((a) => a.status === 'failed' && a.retryable !== false)) {
+          const matches = all.filter((f) => f.name === asset.name && f.status === 'accepted')
+          if (matches.length !== 1) throw new Error('다시 읽을 원본을 확인할 수 없어요. 파일 교체를 선택해 주세요.')
+          const original = matches[0]
+          if (automatic && original.kind === 'file') continue
+          await retryFailedFiles(sessionId, [asset.assetId], { settings, consent, assets: [{ ...original, password: passwords[asset.assetId] ?? '' }] })
+        }
         setAttempt((n) => n + 1)
       }
-    } catch (err) {
-      setActionError(err.message)
-    } finally {
-      setRetrying(false)
-    }
-  }
+      setPasswords({})
+    } catch (err) { setActionError(err.message) }
+    finally { retrying.current = false; setBusy(false) }
+  }, [bankFiles, files, job, mockJobId, sessionId, settings, consent, passwords])
+
+  useEffect(() => {
+    const targets = job?.perAsset?.filter((a) => a.status === 'failed') ?? []
+    if ((!USE_MOCK && !CAN_RETRY_WITH_FILES) || !['partial', 'failed'].includes(job?.state) || !targets.length || autoRetries.current >= 2 || actionError || autoJob.current === jobId) return
+    // 파일 암호는 보관하지 않으므로 은행 파일은 암호를 다시 입력한 뒤 수동 재시도한다.
+    if (!targets.every((a) => a.retryable === true && originals.filter((f) => f.name === a.name).length === 1 && originals.find((f) => f.name === a.name)?.kind === 'image')) return
+    let active = true
+    queueMicrotask(() => {
+      if (!active || autoJob.current === jobId) return
+      autoRetries.current++
+      autoJob.current = jobId
+      retry(true)
+    })
+    return () => { active = false }
+  }, [job, jobId, originals, actionError, retry])
 
   const replace = async () => {
-    if (!USE_MOCK) {
-      try {
-        await resetForReplace(sessionId)
-      } catch (err) {
-        setActionError(err.message)
-        return
-      }
-    }
-    navigate(SCREEN.S01, {}, { replace: true })
+    if (busy) return
+    setBusy(true)
+    try {
+      if (!USE_MOCK) await resetForReplace(sessionId)
+      navigate(SCREEN.S01, {}, { replace: true })
+    } catch (err) { setActionError(err.message); setBusy(false) }
   }
 
-  // E04 일부 캡처를 읽지 못했어요 / 전체 실패
-  if (job && (job.state === 'partial' || job.state === 'failed')) {
-    const allFailed = job.state === 'failed'
-    return (
-      <ScreenLayout
-        title={allFailed ? '캡처를 읽지 못했어요' : '일부 캡처를\n읽지 못했어요'}
-        showBack={false}
-        footer={
-          <>
-            {actionError ? <p role="alert" className="text-center text-caption text-danger-ink">{actionError}</p> : null}
-            {!allFailed ? <Button disabled={busy} onClick={goReview}>{busy ? '불러오는 중…' : `성공한 ${succeeded}장으로 검토`}</Button> : null}
-            <Button variant={allFailed ? 'primary' : 'secondary'} disabled={retrying} onClick={retry}>
-              {retrying ? '다시 읽는 중…' : '실패한 파일만 다시 시도'}
-            </Button>
-            <Button variant="secondary" onClick={replace}>
-              캡처 교체하기
-            </Button>
-          </>
-        }
-      >
-        <section className="flex flex-col gap-3 rounded-[18px] bg-surface p-[18px]">
-          <div className="flex items-center justify-between">
-            <h2 className="text-heading">
-              {total}장 중 {succeeded}장 완료
-            </h2>
-            <Badge tone="coral">{failed.length}장 실패</Badge>
-          </div>
-          <ul className="flex flex-col gap-2">
-            {failed.map((a) => (
-              <li key={a.assetId} className="flex items-center gap-2.5 rounded-xl bg-coral-tint px-3.5 py-3">
-                <Icon name="alert" size={18} className="text-coral" />
-                <div className="min-w-0">
-                  <p className="truncate text-body-b">{a.name}</p>
-                  <p className="text-caption text-ink-2">{a.reason}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
-        <Note tone="gray">
-          {allFailed
-            ? '거래가 보이는 결제 내역 화면인지 확인한 뒤 다시 시도하거나 캡처를 바꿔주세요.'
-            : `성공한 ${succeeded}장의 거래는 그대로 유지돼요. 다시 시도해도 같은 거래가 중복으로 생기지 않아요.`}
-        </Note>
-      </ScreenLayout>
-    )
-  }
+  if (!jobId) return <ScreenLayout title="진행 중인 작업이 없어요" footer={<Button onClick={() => navigate(SCREEN.S01)}>내역 올리러 가기</Button>}><Note>설정 화면에서 내역을 선택해 주세요.</Note></ScreenLayout>
+  const noTransactions = noRows || job?.state === 'no_transactions'
+  const current = finished ? 4 : Math.max(0, KEYS.indexOf(job?.stage))
+  const completed = assets.filter((a) => ['succeeded', 'failed', 'skipped'].includes(a.status)).length
+  const progress = finished ? 1 : assets.length ? Math.min(0.95, completed / assets.length * 0.6 + current / 4 * 0.4) : 0
+  const hasBank = bankFiles.some((f) => f.status === 'accepted')
 
-  return (
-    <ScreenLayout
-      title="캡처를 읽고 있어요"
-      description="보통 30초 안에 끝나요. 화면을 나가도 이어서 진행돼요."
-      showBack={false}
-      footer={
-        <>
-          {actionError ? <p role="alert" className="text-center text-caption text-danger-ink">{actionError}</p> : null}
-          <Button disabled={!finished || busy} onClick={goReview}>
-            {busy ? '불러오는 중…' : finished ? '읽어온 내역 확인하기' : '읽는 중…'}
-          </Button>
-        </>
-      }
-    >
-      <section className="flex flex-col gap-3 rounded-[18px] bg-surface p-[18px]" aria-live="polite">
-        <div className="flex items-center justify-between">
-          <h2 className="text-heading">
-            {done} / {total || '–'}장 완료
-          </h2>
-          <span className="text-body-b text-brand">{Math.round(progress * 100)}%</span>
-        </div>
-        <ProgressBar value={progress} label="전체 진행" />
-        <Stepper steps={stageSteps(job)} />
-      </section>
-
-      <section className="rounded-[18px] bg-surface px-[18px] pt-3.5 pb-1.5">
-        <h2 className="text-heading">파일별 상태</h2>
-        <ul>
-          {perAsset.map((a) => {
-            const s = FILE_STATUS[a.status]
-            return (
-              <li key={a.assetId} className="flex items-center gap-2.5 py-3">
-                <Icon name={s.icon} size={18} className={s.color} />
-                <span className="min-w-0 flex-1 truncate text-body-m">{a.name}</span>
-                <span className={`text-caption-m ${a.status === 'running' ? 'text-brand' : 'text-ink-2'}`}>{s.text}</span>
-              </li>
-            )
-          })}
-          {perAsset.length === 0 ? <li className="py-3 text-caption text-ink-3">파일 목록을 불러오는 중이에요</li> : null}
-        </ul>
-      </section>
-
-      {error ? (
-        <Note tone="warn" icon="alert">
-          상태를 불러오지 못해서 잠시 뒤 다시 확인하고 있어요.
-        </Note>
-      ) : null}
-      <Note tone="gray">성공한 파일은 유지하고, 실패한 파일만 다시 시도할 수 있어요.</Note>
-    </ScreenLayout>
-  )
+  return <ScreenLayout showBack={false}
+    title={noTransactions ? '결제 내역을 찾지 못했어요' : failed.length ? '읽지 못한 내역을 확인해 주세요' : hasBank ? '거래내역을 읽고 있어요' : '캡처를 읽고 있어요'}
+    description={noTransactions ? '거래 날짜와 금액이 있는 내역 파일이나 캡처로 교체해 주세요.' : '읽기가 끝나면 내역을 검토하는 화면으로 이동해요.'}
+    footer={<>
+      {actionError ? <p role="alert" className="text-caption text-danger-ink">{actionError}</p> : null}
+      {noTransactions ? <Button disabled={busy} onClick={replace}>내역 교체하기</Button> : <>
+        {(USE_MOCK || CAN_RETRY_WITH_FILES) && failed.some((a) => a.retryable !== false) ? <Button disabled={busy} onClick={() => retry()}>{busy ? '다시 읽는 중…' : '실패한 파일만 다시 읽기'}</Button> : null}
+        {finished && succeeded > 0 ? <Button disabled={busy} onClick={goReview}>{busy ? '불러오는 중…' : '성공한 내역으로 검토'}</Button> : null}
+        {failed.length > 0 ? <Button variant="secondary" disabled={busy} onClick={replace}>파일·암호 교체하기</Button> : null}
+      </>}
+    </>}>
+    <section className="flex flex-col gap-3 rounded-2xl bg-surface p-4" aria-live="polite">
+      <p className="text-body-b">{completed} / {assets.length || '–'}개 확인</p>
+      <ProgressBar value={progress} label="전체 진행" />
+      <Stepper steps={STAGES.map((label, i) => ({ label: i === 0 ? hasBank ? '거래내역 읽기' : '캡처 읽기' : label, status: i < current ? 'done' : i === current ? 'run' : 'todo' }))} />
+    </section>
+    <ul className="flex flex-col gap-3">
+      {assets.map((asset) => <li key={asset.assetId} className="min-w-0 rounded-xl bg-surface p-3">
+        <p className="truncate text-body-b" title={asset.name}>{asset.name}</p>
+        <p className="text-caption text-ink-2">{STATUS[asset.status] ?? '확인 중'}</p>
+        {asset.reason ? <p className="text-caption text-danger-ink">{asset.reason}</p> : null}
+        {(USE_MOCK || CAN_RETRY_WITH_FILES) && asset.status === 'failed' && asset.retryable !== false && originalFor(asset)?.kind === 'file'
+          ? <TextField label="다시 읽을 파일의 열기 암호" type="password" autoComplete="off" value={passwords[asset.assetId] ?? ''} onChange={(e) => setPasswords((prev) => ({ ...prev, [asset.assetId]: e.target.value }))} /> : null}
+      </li>)}
+    </ul>
+    {hasBank ? <Note tone="gray">선택한 기간: {slots.map(formatMonth).join(', ')}. 파일에서 읽은 월별 내역은 검토 화면에서 확인할 수 있어요.</Note> : null}
+    {error ? <Note tone="warn">서버 상태를 다시 확인하고 있어요. 연결이 계속 안 되면 잠시 후 다시 시도해 주세요.</Note> : null}
+    <ConfirmDialog open={emptyMonths.length > 0} title={`${emptyMonths.map(formatMonth).join(', ')} 내역이 없어요`} confirmLabel="빈 달을 빼고 진행" cancelLabel="내역 추가하기"
+      onConfirm={() => navigate(SCREEN.S03, {}, { replace: true })} onCancel={() => navigate(SCREEN.S01, {}, { replace: true })}>
+      비어 있는 달은 분석과 월 환산에서 제외돼요. 그대로 진행할까요?
+    </ConfirmDialog>
+  </ScreenLayout>
 }

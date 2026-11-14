@@ -14,14 +14,14 @@ function isRealDate(value) {
 export function validateTransaction(t) {
   const errors = {}
   if (!isRealDate(t.date)) errors.date = '날짜를 확인해 주세요'
-  else if (t.slotMonth && !t.date.startsWith(t.slotMonth)) errors.date = '이 캡처의 달과 날짜가 달라요'
+  else if (t.slotMonth && !t.date.startsWith(t.slotMonth)) errors.date = '이 파일의 달과 날짜가 달라요'
   if (t.time && !TIME_RE.test(t.time)) errors.time = '00:00 형식으로 적어주세요'
   if (!t.merchant?.trim()) errors.merchant = '가맹점명을 적어주세요'
   else if (t.merchant.trim().length > 100) errors.merchant = '100자 이내로 적어주세요'
   if (!Number.isInteger(t.amountKrw) || t.amountKrw <= 0) errors.amountKrw = '금액을 원 단위 숫자로 적어주세요'
   if (!t.direction) errors.direction = '방향을 골라주세요'
   if (!t.kind) errors.kind = '종류를 골라주세요'
-  if (!t.category) errors.category = '카테고리를 골라주세요'
+  if (['expense', 'transfer'].includes(t.kind) && t.direction === 'out' && !t.category) errors.category = '카테고리를 골라주세요'
   return errors
 }
 

@@ -11,7 +11,7 @@ import { formatKRW, formatShortDate } from '../utils/format'
 // E02 중복 후보 확인 (F05) · 기본 merge, separate면 둘 다 포함. 어느 쪽도 영구 삭제하지 않는다.
 export default function E02DuplicatePage({ params }) {
   const { navigate, back } = useAppNavigation()
-  const { draft, setDuplicateDecision } = useAnalysisSession()
+  const { draft, setDuplicateDecision, syncBusy, syncError } = useAnalysisSession()
   const groups = draft?.duplicateGroups ?? []
   const index = Math.min(params?.index ?? 0, Math.max(0, groups.length - 1))
   const group = groups[index]
@@ -26,8 +26,8 @@ export default function E02DuplicatePage({ params }) {
 
   const members = group.memberIds.map((id) => draft.transactions.find((t) => t.id === id)).filter(Boolean)
 
-  const decide = (decision) => {
-    setDuplicateDecision(group.id, decision)
+  const decide = async (decision) => {
+    if (!(await setDuplicateDecision(group.id, decision))) return
     if (index + 1 < groups.length) navigate(SCREEN.E02, { index: index + 1 }, { replace: true })
     else back(SCREEN.S03)
   }
@@ -40,8 +40,9 @@ export default function E02DuplicatePage({ params }) {
       contentClassName="gap-3.5"
       footer={
         <>
-          <Button onClick={() => decide('merge')}>같은 거래 · 유지</Button>
-          <Button variant="secondary" onClick={() => decide('separate')}>
+          {syncError ? <p role="alert" className="text-caption text-danger-ink">{syncError}</p> : null}
+          <Button disabled={syncBusy} onClick={() => decide('merge')}>같은 거래 · 유지</Button>
+          <Button disabled={syncBusy} variant="secondary" onClick={() => decide('separate')}>
             서로 다른 결제 · 둘 다 포함
           </Button>
         </>
@@ -50,7 +51,7 @@ export default function E02DuplicatePage({ params }) {
       {members.map((t) => (
         <section key={t.id} className="rounded-2xl bg-surface p-4">
           <p className="text-body-b">
-            {t.source ?? '캡처'} · {t.merchant}
+            {t.source ?? '파일'} · {t.merchant}
           </p>
           <p className="text-caption text-ink-3">
             {formatShortDate(t.date)} {t.time ?? '시각 없음'} · {DIRECTIONS.find((d) => d.value === t.direction)?.label} · {formatKRW(t.amountKrw)}

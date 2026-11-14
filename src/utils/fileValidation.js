@@ -1,67 +1,65 @@
-import { ACCEPTED_MIME_TYPES, MAX_FILE_BYTES, MAX_FILES_PER_UPLOAD } from '../constants/limits'
+import { BANK_FILE_MIME, IMAGE_MIME_TYPES, MAX_BANK_FILE_BYTES, MAX_FILE_BYTES, MAX_FILES_PER_UPLOAD } from '../constants/limits.js'
 
-// F02 파일별 검증 · 형식·용량·개수·디코딩을 확인해 accepted/rejected로 나눈다.
-// 서버도 같은 검증을 다시 한다. 여기서는 사용자가 바로 이유를 볼 수 있게 하는 역할이다.
+const OLE_HEADER = [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]
+const ZIP_HEADER = [0x50, 0x4b, 0x03, 0x04]
 
 export const REJECT_REASON = {
-  type: 'JPG·PNG·WebP만 올릴 수 있어요',
-  size: '10MB를 넘는 파일이에요',
-  count: '한 번에 10장까지만 올릴 수 있어요',
-  decode: '이미지를 열 수 없어요',
+  imageType: 'JPG·PNG·WebP 캡처만 추가할 수 있어요',
+  bankType: '토스뱅크에서 발급한 .xlsx 거래내역 파일을 선택해 주세요',
+  size: '캡처는 장당 10MB까지 올릴 수 있어요',
+  bankSize: '거래내역 파일은 20MB까지 올릴 수 있어요',
+  count: '한 번에 캡처 10장까지만 추가할 수 있어요',
+  decode: '파일을 읽을 수 없어요. 원본 파일을 다시 선택해 주세요',
 }
 
-async function canDecode(file) {
-  let image
-  let objectUrl
+async function canDecodeImage(file) {
   try {
     if (typeof createImageBitmap === 'function') {
       const bitmap = await createImageBitmap(file)
-      bitmap.close?.()
+      bitmap.close()
       return true
     }
-
-    // createImageBitmap이 없는 환경에서도 로컬 이미지를 실제로 열어 검증한다.
-    image = new Image()
-    objectUrl = URL.createObjectURL(file)
-    return await new Promise((resolve) => {
-      image.onload = () => resolve(image.naturalWidth > 0 && image.naturalHeight > 0)
-      image.onerror = () => resolve(false)
-      image.src = objectUrl
-    })
+    const url = URL.createObjectURL(file)
+    try {
+      return await new Promise((resolve) => {
+        const img = new Image()
+        img.onload = () => resolve(img.naturalWidth > 0 && img.naturalHeight > 0)
+        img.onerror = () => resolve(false)
+        img.src = url
+      })
+    } finally {
+      URL.revokeObjectURL(url)
+    }
   } catch {
     return false
-  } finally {
-    if (image) {
-      image.onload = null
-      image.onerror = null
-    }
-    if (objectUrl) URL.revokeObjectURL(objectUrl)
   }
 }
 
-let seq = 0
-const nextId = () => `local_${Date.now().toString(36)}_${(seq += 1)}`
+// 암호화된 xlsx는 OLE 컨테이너다. 실제 문서 파싱·암호 검증은 동의 후 서버가 한다.
+async function hasWorkbookHeader(file) {
+  try {
+    const bytes = new Uint8Array(await file.slice(0, 8).arrayBuffer())
+    return [ZIP_HEADER, OLE_HEADER].some((header) => header.every((byte, index) => bytes[index] === byte))
+  } catch {
+    return false
+  }
+}
 
-/**
- * @param {File[]} files 이번에 고른 파일
- * @returns {Promise<Array<{id, file, name, size, status: 'accepted'|'rejected', reason?: string}>>}
- */
-export async function validateFiles(files) {
+export async function validateFiles(files, { kind = 'image', decodeImage = canDecodeImage } = {}) {
   const results = []
-  for (let i = 0; i < files.length; i += 1) {
-    const file = files[i]
-    const base = { id: nextId(), file, name: file.name, size: file.size }
-    if (i >= MAX_FILES_PER_UPLOAD) {
-      results.push({ ...base, status: 'rejected', reason: REJECT_REASON.count })
-    } else if (!ACCEPTED_MIME_TYPES.includes(file.type)) {
-      results.push({ ...base, status: 'rejected', reason: REJECT_REASON.type })
-    } else if (file.size > MAX_FILE_BYTES) {
-      results.push({ ...base, status: 'rejected', reason: REJECT_REASON.size })
-    } else if (!(await canDecode(file))) {
-      results.push({ ...base, status: 'rejected', reason: REJECT_REASON.decode })
-    } else {
-      results.push({ ...base, status: 'accepted' })
-    }
+  for (const [index, file] of files.entries()) {
+    const base = { id: `local_${crypto.randomUUID()}`, file, name: file.name, size: file.size, kind }
+    const mime = file.type.toLowerCase()
+    const isBank = kind === 'file'
+    const validType = isBank
+      ? /\.xlsx$/i.test(file.name) && ['', 'application/octet-stream', 'application/x-ole-storage', BANK_FILE_MIME].includes(mime)
+      : IMAGE_MIME_TYPES.includes(mime)
+    let reason
+    if (!isBank && index >= MAX_FILES_PER_UPLOAD) reason = REJECT_REASON.count
+    else if (!validType) reason = isBank ? REJECT_REASON.bankType : REJECT_REASON.imageType
+    else if (file.size > (isBank ? MAX_BANK_FILE_BYTES : MAX_FILE_BYTES)) reason = isBank ? REJECT_REASON.bankSize : REJECT_REASON.size
+    else if (file.size === 0 || !(await (isBank ? hasWorkbookHeader(file) : decodeImage(file)))) reason = REJECT_REASON.decode
+    results.push({ ...base, status: reason ? 'rejected' : 'accepted', ...(reason ? { reason } : {}) })
   }
   return results
 }

@@ -17,6 +17,12 @@ const PATHS = {
     </>
   ),
   plus: <path d="M12 5v14M5 12h14" strokeWidth="2.2" />,
+  file: (
+    <>
+      <path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9l-6-6z" />
+      <path d="M14 3v6h6M8 13h8M8 17h6" />
+    </>
+  ),
   image: (
     <>
       <rect x="3.5" y="4.5" width="17" height="15" rx="3" />

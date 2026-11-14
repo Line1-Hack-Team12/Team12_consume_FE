@@ -1,4 +1,4 @@
-import { SELECTABLE_MONTH_RANGE, TIME_ZONE } from '../constants/limits'
+import { SELECTABLE_MONTH_RANGE, TIME_ZONE } from '../constants/limits.js'
 
 // 'YYYY-MM' 문자열을 다루는 순수 함수 모음
 

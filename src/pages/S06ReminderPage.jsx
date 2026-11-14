@@ -4,12 +4,14 @@ import ScreenLayout from '../components/layout/ScreenLayout'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import Chip from '../components/ui/Chip'
+import Checkbox from '../components/ui/Checkbox'
 import Note from '../components/ui/Note'
 import { SCREEN } from '../constants/screens'
 import { useAnalysisSession } from '../hooks/analysisSessionContext'
 import { useAppNavigation } from '../hooks/navigationContext'
 import { createInitialPatternResponse } from '../mocks/patternResponses'
 import { S05_PREVIEW_ANALYSIS } from '../mocks/s05Preview'
+import ServerReminderManager from './S06/ServerReminderManager'
 import ReminderSettings from './S06/ReminderSettings'
 
 // F14. 규칙 설정은 기존 카드 응답과 공유하고, 발송·스케줄은 연결하지 않는다.
@@ -29,12 +31,14 @@ export default function S06ReminderPage({ params }) {
     )
   }
 
+  if (validResult.mode === 'server') return <ServerReminderManager sessionId={snapshot.sessionId} />
+
   return <ReminderManager key={`${designPreview}:${validResult.snapshotId}`} result={validResult} designPreview={designPreview} />
 }
 
 function ReminderManager({ result, designPreview }) {
   const { navigate, back: goBack } = useAppNavigation()
-  const { settings, patternResponseStore: store } = useAnalysisSession()
+  const { settings, patternResponseStore: store, savingsPlanStore, selectedPlan } = useAnalysisSession()
   const rules = result.patterns.filter((pattern) => pattern.reminderSuggestion)
   const prefix = `${designPreview ? 'preview' : 'snapshot'}:${result.snapshotId}:`
   const [selectedId, setSelectedId] = useState(() => rules.find((pattern) => (
@@ -94,6 +98,11 @@ function ReminderManager({ result, designPreview }) {
       ) : null}
 
       {leaveError ? <Note tone="warn" icon="alert"><p role="alert">{leaveError}</p></Note> : null}
+      {selectedPlan?.actionChecks?.length ? <Card className="flex flex-col gap-3">
+        <h2 className="text-heading">선택한 플랜의 행동 체크</h2>
+        {selectedPlan.actionChecks.map((item) => <Checkbox key={item.id} checked={item.state === 'done'} onChange={(checked) => savingsPlanStore.setActionChecked(item.id, checked)}>{item.label}</Checkbox>)}
+        <p className="text-caption text-ink-3">체크는 실행 여부를 기록하는 용도예요. 구독 해지가 자동으로 실행되지는 않아요.</p>
+      </Card> : null}
 
       {selected ? (
         <ReminderSettings key={selected.id} pattern={selected} snapshotId={result.snapshotId} designPreview={designPreview} tone={settings.tone} disabled={leaving} />

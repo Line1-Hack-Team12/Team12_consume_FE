@@ -5,8 +5,11 @@ import Icon from '../../components/ui/Icon'
 export default function CapturePreviewDialog({ file, onClose }) {
   const dialogRef = useRef(null)
   const titleId = useId()
+  const imageRef = useRef(null)
 
   useEffect(() => {
+    const objectUrl = URL.createObjectURL(file.file)
+    imageRef.current.src = objectUrl
     const dialog = dialogRef.current
     const previousFocus = document.activeElement
     const { scrollX, scrollY } = window
@@ -29,6 +32,7 @@ export default function CapturePreviewDialog({ file, onClose }) {
     dialog.showModal()
 
     return () => {
+      URL.revokeObjectURL(objectUrl)
       dialog.close()
       Object.assign(body.style, previousStyle)
       window.scrollTo({ left: scrollX, top: scrollY, behavior: 'instant' })
@@ -36,7 +40,7 @@ export default function CapturePreviewDialog({ file, onClose }) {
         previousFocus.focus({ preventScroll: true })
       }
     }
-  }, [])
+  }, [file.file])
 
   return (
     <dialog
@@ -68,7 +72,7 @@ export default function CapturePreviewDialog({ file, onClose }) {
         tabIndex={0}
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-4 pb-[max(16px,env(safe-area-inset-bottom))] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand"
       >
-        <img src={file.url} alt={file.name} className="mx-auto block h-auto w-full rounded-lg" />
+        <img ref={imageRef} alt={file.name} className="mx-auto block h-auto w-full rounded-lg" />
       </div>
     </dialog>
   )

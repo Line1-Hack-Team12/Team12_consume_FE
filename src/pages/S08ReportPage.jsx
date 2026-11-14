@@ -1,4 +1,7 @@
+import { useState } from 'react'
 import back from '../assets/icons/chevron-left.svg'
+import { getReport } from '../api/analysis'
+import { toReport } from '../api/analysisAdapters'
 import info from '../assets/icons/info.svg'
 import ScreenLayout from '../components/layout/ScreenLayout'
 import Button from '../components/ui/Button'
@@ -18,7 +21,9 @@ import RecurringPaymentsCard from './S08/RecurringPaymentsCard'
 // F15·F16·F18. 확정 분석 응답을 표시하며, 화면에서 거래를 다시 집계하거나 탐지하지 않는다.
 export default function S08ReportPage({ params }) {
   const { navigate } = useAppNavigation()
-  const { settings, snapshot, analysis } = useAnalysisSession()
+  const { settings, snapshot, analysis, setAnalysis } = useAnalysisSession()
+  const [retrying, setRetrying] = useState(false)
+  const [reportError, setReportError] = useState('')
   const designPreview = import.meta.env.DEV && new URLSearchParams(window.location.search).get('demo') === 's05'
   const result = designPreview ? S05_PREVIEW_ANALYSIS : snapshot && analysis?.snapshotId === snapshot.id ? analysis : null
   const validResult = !params?.snapshotId || params.snapshotId === result?.snapshotId ? result : null
@@ -58,7 +63,15 @@ export default function S08ReportPage({ params }) {
           <p>{report.limitations.join(' ')}</p>
         </Note>
       </> : (
-        <Note tone="warn" icon="alert">지출 합계는 확인할 수 있지만 리포트 상세 자료가 아직 없어요. 결과 홈에서 다른 분석 내용을 확인할 수 있어요.</Note>
+        <Note tone="warn" icon="alert">
+          <p>{reportError || '지출 합계는 확인할 수 있지만 리포트 상세 자료가 아직 없어요.'}</p>
+          {validResult.mode === 'server' ? <Button size="sm" disabled={retrying} onClick={async () => {
+            setRetrying(true)
+            try { const response = await getReport(snapshot.sessionId); setAnalysis({ ...validResult, report: toReport(response, snapshot.slots, tone) }); setReportError('') }
+            catch (err) { setReportError(err.message) }
+            finally { setRetrying(false) }
+          }}>리포트 다시 불러오기</Button> : null}
+        </Note>
       )}
 
       {validResult.mode === 'demo' ? <p className="text-micro text-ink-3">{designPreview ? '디자인 미리보기 · 합성 예시 데이터예요.' : '데모 리포트 · 확정한 예시 거래 기준이에요. 실제 AI·날씨·정기결제 분석은 아직 연결되지 않았어요.'}</p> : null}

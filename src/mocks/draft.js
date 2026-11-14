@@ -54,7 +54,7 @@ function makeRow(id, slotMonth, day, time, src, amount, extra = {}) {
 }
 
 /**
- * @param {string[]} slots 분석에 들어간 슬롯 월 (캡처가 있는 달만)
+ * @param {string[]} slots 분석에 들어간 슬롯 월 (파일이 있는 달만)
  * @returns {{ revision, transactions, duplicateGroups }}
  */
 export function generateMockDraft(slots) {
@@ -87,8 +87,8 @@ export function generateMockDraft(slots) {
     )
 
     // 같은 슬롯 안 겹친 거래 후보 (기본 merge)
-    const a = makeRow(nextId(), slotMonth, 27, '22:05', MERCHANTS[0], 23500, { source: `${Number(slotMonth.slice(5))}월 캡처 A` })
-    const b = makeRow(nextId(), slotMonth, 27, '22:05', MERCHANTS[0], 23500, { source: `${Number(slotMonth.slice(5))}월 캡처 B` })
+    const a = makeRow(nextId(), slotMonth, 27, '22:05', MERCHANTS[0], 23500, { source: `${Number(slotMonth.slice(5))}월 파일 A` })
+    const b = makeRow(nextId(), slotMonth, 27, '22:05', MERCHANTS[0], 23500, { source: `${Number(slotMonth.slice(5))}월 파일 B` })
     transactions.push(a, b)
     duplicateGroups.push({ id: `dup_${slotIndex + 1}`, slotMonth, memberIds: [a.id, b.id], representativeId: a.id, decision: 'merge', reviewed: false })
   })
@@ -115,35 +115,13 @@ export function generateMockDraft(slots) {
 
 export const REVIEW_REASON_LABEL = {
   low_confidence: '금액이 흐릿해요',
+  date_missing: '날짜가 비어 있어요',
+  merchant_missing: '가맹점명이 비어 있어요',
+  month_mismatch: '고른 달과 날짜가 달라요',
+  unknown_kind: '거래 종류를 확인해 주세요',
   missing_required: '필수값이 비어 있어요',
   slot_mismatch: '고른 달과 날짜가 달라요',
   unknown_direction: '입금인지 출금인지 모르겠어요',
 }
 
-/** 중복 merge에서 대표가 아닌 거래 ID 목록 */
-function mergedAwayIds(duplicateGroups) {
-  const ids = new Set()
-  for (const g of duplicateGroups) {
-    if (g.decision === 'merge') g.memberIds.filter((id) => id !== g.representativeId).forEach((id) => ids.add(id))
-  }
-  return ids
-}
-
-/**
- * 검토 화면 요약 · 서버 draft.summary가 생기면 그 값을 쓴다.
- * 지출 = 포함 + 출금 + 지출 종류, 중복 merge는 대표 1건만.
- */
-export function summarizeDraft(draft) {
-  if (!draft) return { expenseCount: 0, expenseSum: 0, bySlot: {} }
-  const away = mergedAwayIds(draft.duplicateGroups)
-  const bySlot = {}
-  let expenseCount = 0
-  let expenseSum = 0
-  for (const t of draft.transactions) {
-    if (!t.included || away.has(t.id) || t.direction !== 'out' || t.kind !== 'expense') continue
-    expenseCount += 1
-    expenseSum += t.amountKrw
-    bySlot[t.slotMonth] = (bySlot[t.slotMonth] ?? 0) + 1
-  }
-  return { expenseCount, expenseSum, bySlot }
-}
+export { summarizeDraft } from '../utils/transactions.js'

@@ -193,6 +193,12 @@ export function createSavingsPlanStore({ responseStore }) {
     subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener) },
     get(key) { return entries.get(key) },
     getSelectedPlan() { return selectedPlan },
+    setActionChecked(id, checked) {
+      if (!selectedPlan || !active(selectedPlan.scope)) return
+      selectedPlan = { ...selectedPlan, actionChecks: selectedPlan.actionChecks.map((item) => item.id === id ? { ...item, state: checked ? 'done' : 'todo' } : item) }
+      const entry = entries.get(selectedPlan.scope)
+      if (entry) replace(selectedPlan.scope, { ...entry, selectedPlan })
+    },
     setSnapshot(snapshotId) {
       activeSnapshotId = snapshotId
       if (selectedPlan?.scope.startsWith('snapshot:') && selectedPlan.snapshotId !== snapshotId) { selectedPlan = null; emit() }

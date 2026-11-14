@@ -4,6 +4,6 @@
 //   (백엔드가 멈췄을 때 발표·시연용 대비)
 const param = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('mock') : null
 
-export const USE_MOCK = param === '1' || (param !== '0' && import.meta.env.VITE_USE_MOCK === 'true')
+export const USE_MOCK = param === '1' || (param !== '0' && import.meta.env?.VITE_USE_MOCK === 'true')
 
-export const API_BASE = import.meta.env.VITE_API_BASE ?? ''
+export const API_BASE = import.meta.env?.VITE_API_BASE ?? ''

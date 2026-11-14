@@ -67,14 +67,14 @@ export default function S09SavingsPlanPage({ params }) {
         </>
       }
     >
-      <GoalCard value={savings.goalKrw} max={savings.sliderMaxKrw} disabled={savings.choosing || savings.maxPossibleKrw < MIN_PLAN_GOAL_KRW} onChange={savings.setGoal} />
+      <GoalCard value={savings.goalKrw} max={savings.sliderMaxKrw} disabled={savings.choosing || Number.isFinite(savings.maxPossibleKrw) && savings.maxPossibleKrw < MIN_PLAN_GOAL_KRW} onChange={savings.setGoal} />
 
       <section className="flex flex-col gap-2.5" aria-labelledby="plan-locks-title">
         <h2 id="plan-locks-title" className="text-body-b">줄이기 어려운 항목</h2>
         {savings.locks.length > 0 ? (
           <div className="flex flex-wrap gap-2" role="group" aria-label="줄이기 어려운 항목 잠금">
             {savings.locks.map((lock) => (
-              <Chip key={lock.id} showCheck={false} selected={lock.locked} disabled={savings.choosing} onClick={() => savings.toggleLock(lock.id)}>
+              <Chip key={lock.id} showCheck={false} selected={lock.locked} disabled={savings.choosing || lock.supported === false} onClick={() => savings.toggleLock(lock.id)}>
                 {lock.locked ? <>{lock.label}</> : lock.label}
               </Chip>
             ))}

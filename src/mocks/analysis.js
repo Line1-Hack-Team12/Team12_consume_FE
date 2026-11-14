@@ -151,7 +151,12 @@ function examplePattern(example, rows, snapshotId, slots) {
     associationNote: '함께 관찰된 지출이 원인 관계를 뜻하지는 않아요.',
     evidence: evidence.map(({ id, date, time, merchant, amountKrw }) => ({ id, date, time, merchant, amountKrw })),
     recommendedTags: example.recommendedTags,
-    reminderSuggestion: null,
+    // 합성 데모에서만 근거 행의 요일·시각으로 사전 알림 예시를 만든다.
+    reminderSuggestion: evidence[0]?.time && Number(evidence[0].time.slice(0, 2)) >= 9 && Number(evidence[0].time.slice(0, 2)) <= 22 ? {
+      weekday: new Date(`${evidence[0].date}T00:00:00Z`).getUTCDay(),
+      time: `${String(Number(evidence[0].time.slice(0, 2)) - 1).padStart(2, '0')}${evidence[0].time.slice(2)}`,
+      expectedConsumptionTime: evidence[0].time,
+    } : null,
     copyByTone: {
       coach: { observation, hypothesisQuestion: example.question, action: example.action },
       friend: { observation: `서로 다른 ${observedDays}일에 보였어`, hypothesisQuestion: example.friendQuestion, action: example.friendAction },

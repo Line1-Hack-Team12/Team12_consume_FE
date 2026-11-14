@@ -5,7 +5,7 @@ import { SCREEN } from '../constants/screens'
 import { useAppNavigation } from '../hooks/navigationContext'
 
 const FEATURES = [
-  { icon: 'image', tone: 'brand', title: '캡처 몇 장으로 시작', body: '거래를 정리하고, 반복되는 상황을 찾아드려요.' },
+  { icon: 'file', tone: 'brand', title: '거래내역 파일로 시작', body: '거래를 정리하고, 반복되는 상황을 찾아드려요.' },
   { icon: 'alert', tone: 'coral', title: '돈이 새는 상황을 이해해요', body: '직접 비용과 뒤따른 지출을 함께 확인하세요.' },
   { icon: 'check', tone: 'success', title: '다음 행동은 내가 정해요', body: '원인에 답하고, 지킬 수 있는 횟수 플랜을 골라요.' },
 ]
@@ -25,7 +25,7 @@ export default function S00StartPage() {
           <br />
           찾아보세요
         </h1>
-        <p className="text-body text-ink-2">결제 내역 캡처만 올리면, 같은 상황에서 반복된 지출과 그 뒤에 따라온 비용까지 보여드려요.</p>
+        <p className="text-body text-ink-2">은행 거래내역 엑셀이나 결제 내역 캡처를 올리면, 같은 상황에서 반복된 지출과 그 뒤에 따라온 비용까지 보여드려요.</p>
       </div>
 
       <ul className="flex flex-col gap-3">

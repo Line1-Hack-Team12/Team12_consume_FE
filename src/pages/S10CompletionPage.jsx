@@ -54,15 +54,16 @@ export default function S10CompletionPage({ params }) {
       <Card tone="canvas" padding="none" className="px-[18px] pt-4 pb-1.5" aria-labelledby="completion-summary-title">
         <h2 id="completion-summary-title" className="text-caption-m text-ink-2">이번에 확인한 내용</h2>
         <dl>
-          <SummaryRow label="관찰한 패턴">{formatNumber(summary.patternCount)}개</SummaryRow>
-          <SummaryRow label="답한 질문">{formatNumber(summary.answeredCount)}개</SummaryRow>
+          <SummaryRow label="관찰한 패턴">{summary.loading || summary.error ? '확인 중' : `${formatNumber(summary.patternCount)}개`}</SummaryRow>
+          <SummaryRow label="답한 질문">{summary.loading || summary.error ? '확인 중' : `${formatNumber(summary.answeredCount)}개`}</SummaryRow>
           <SummaryRow label={allFromPlan ? '플랜에서 켜진 demo 규칙' : '켜진 demo 규칙'}>
-            {formatNumber(summary.enabledReminderCount)}개
+            {summary.loading || summary.error ? '확인 중' : `${formatNumber(summary.enabledReminderCount)}개`}
             {!allFromPlan && summary.planReminderCount > 0 ? <span className="mt-0.5 block text-micro text-ink-2">플랜에서 켜짐 {formatNumber(summary.planReminderCount)}개</span> : null}
           </SummaryRow>
-          <SummaryRow label="선택 플랜">{plan ? `${planLabel} · 월 ${formatKRW(plan.monthlySavingsKrw)} 제안` : '선택하지 않음'}</SummaryRow>
+          <SummaryRow label="선택 플랜">{summary.loading || summary.error ? '확인 중' : summary.selectedPlanText ?? (plan ? `${planLabel} · 월 ${formatKRW(plan.monthlySavingsKrw)} 제안` : '선택하지 않음')}</SummaryRow>
         </dl>
       </Card>
+      {summary.error ? <Note tone="warn"><p>{summary.error}</p><Button size="sm" onClick={summary.retry}>요약 다시 불러오기</Button></Note> : null}
 
       {summary.hasUnsavedResponses ? (
         <Note tone="warn" icon="alert">

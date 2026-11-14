@@ -1,64 +1,59 @@
-import { apiRequest } from './client'
+import { apiRequest } from './client.js'
+import { toReviewQueueRequest, toSessionQuery, toSlotMonths, toTransactionRequest } from './requestPayloads.js'
 
-// S01~S03 연동 · 노션 API 명세서와 Swagger(/swagger-ui) 기준
-// 백엔드 응답을 그대로 돌려주고, 화면용 변환은 adapters.js에서 한다.
+// 배포 Swagger /v3/api-docs 기준. 미정 필드는 실제 요청에 추가하지 않는다.
 
-const PERSONA = { coach: 'COACH', friend: 'FRIEND', grandma: 'GRANDMOTHER' }
+export function unsupportedSessionInput({ settings, assets }) {
+  const reasons = []
+  if (settings.ownerName?.trim()) reasons.push('이름으로 본인 이체를 구분하는 기능은 아직 준비 중이에요. 이름을 비우면 내역을 올릴 수 있어요.')
+  if (assets.some((asset) => asset.password)) reasons.push('암호가 걸린 거래내역은 아직 분석할 수 없어요. 캡처로 추가해 주세요.')
+  if (settings.payday === 'last') reasons.push('급여일 말일 지정은 아직 지원하지 않아요. 날짜를 선택하거나 급여일을 비워 주세요.')
+  else if (settings.payday && (!/^\d+$/.test(String(settings.payday)) || Number(settings.payday) < 1 || Number(settings.payday) > 31)) reasons.push('급여일은 1~31일 중 골라 주세요.')
+  return reasons.join(' ')
+}
 
-/** S01 세션 생성 + 캡처 업로드 · 응답: sessionId */
-export function createSession({ settings, assets }) {
+function uploadForm({ settings, assets, consent }) {
+  if (!consent) throw new Error('외부 AI 전송에 동의해야 분석할 수 있어요.')
+  const reason = unsupportedSessionInput({ settings, assets })
+  if (reason) throw new Error(reason)
   const form = new FormData()
-  assets.forEach((a) => form.append('files', a.file, a.name))
+  assets.forEach((asset) => form.append('files', asset.file, asset.name))
+  return form
+}
+
+export function createSession(input) {
   return apiRequest('/api/sessions', {
     method: 'POST',
-    form,
-    query: {
-      monthsCount: settings.monthCount,
-      lastMonth: settings.lastMonth,
-      region: settings.region || undefined,
-      // 급여일 '말일'은 숫자 계약이 없어 보내지 않는다 (P2 기능)
-      payday: /^\d+$/.test(settings.payday ?? '') ? Number(settings.payday) : undefined,
-      persona: PERSONA[settings.tone] ?? 'COACH',
-      aiConsent: true,
-      slotMonths: assets.map((a) => a.slotMonth),
-    },
+    form: uploadForm(input),
+    query: toSessionQuery(input.settings, input.assets, input.consent),
   })
 }
 
+export function appendFiles(sessionId, input) {
+  return apiRequest(`/api/sessions/${sessionId}/files`, { method: 'POST', form: uploadForm(input), query: { slotMonths: toSlotMonths(input.settings, input.assets) } })
+}
+
 export const getSessionStatus = (sessionId, opts) => apiRequest(`/api/sessions/${sessionId}/status`, opts)
-export const retryFailedFiles = (sessionId, fileIds) =>
-  apiRequest(`/api/sessions/${sessionId}/retry-failed`, { method: 'POST', query: { fileIds }, json: {} })
+// Swagger는 JSON 안의 files를 binary로 선언한다. 실제 바이너리 인코딩/전송 방식 확정 전에는 성공으로 간주하지 않는다.
+export const CAN_RETRY_WITH_FILES = false
+export function retryFailedFiles() {
+  throw new Error('파일을 다시 읽는 기능은 아직 준비 중이에요. 파일 교체하기로 다시 올려 주세요.')
+}
 export const resetForReplace = (sessionId) => apiRequest(`/api/sessions/${sessionId}/reset-for-replace`, { method: 'POST' })
 export const proceedPartial = (sessionId) => apiRequest(`/api/sessions/${sessionId}/proceed-partial`, { method: 'POST' })
-
 export const getReview = (sessionId) => apiRequest(`/api/sessions/${sessionId}/review`)
-export const confirmReviewQueue = (sessionId, confirmedItems) =>
-  apiRequest(`/api/sessions/${sessionId}/review/queue/confirm`, { method: 'POST', json: { confirmedItems } })
+export const confirmReviewQueue = (sessionId, confirmedItems) => apiRequest(`/api/sessions/${sessionId}/review/queue/confirm`, { method: 'POST', json: toReviewQueueRequest(confirmedItems) })
 export const checkReview = (sessionId) => apiRequest(`/api/sessions/${sessionId}/review/check`, { method: 'POST' })
 export const getTransactions = (sessionId) => apiRequest(`/api/sessions/${sessionId}/transactions`)
+export const getTransaction = (id) => apiRequest(`/api/transactions/${id}`)
 export const getDuplicates = (sessionId) => apiRequest(`/api/sessions/${sessionId}/duplicates`)
-export const resolveDuplicate = (sessionId, groupId, resolution) =>
-  apiRequest(`/api/sessions/${sessionId}/duplicates/resolve`, { method: 'POST', json: { groupId, resolution } })
+export const resolveDuplicate = (sessionId, groupId, resolution) => apiRequest(`/api/sessions/${sessionId}/duplicates/resolve`, { method: 'POST', json: { groupId, resolution } })
 export const confirmSession = (sessionId) => apiRequest(`/api/sessions/${sessionId}/confirm`, { method: 'POST' })
 export const getAnalysisStatus = (sessionId, opts) => apiRequest(`/api/sessions/${sessionId}/analysis/status`, opts)
 
-/**
- * S03-E 수정 · 그대로 두기 · 제외 · 복원
- * action: 'EDIT' | 'KEEP' | 'EXCLUDE' | 'RESTORE' (서버는 'EXCLUDE'만 제외로 처리하고 나머지는 포함으로 둔다)
- * 서버가 날짜·시각·가맹점·금액을 그대로 덮어쓰므로 바뀌지 않은 값도 함께 보낸다.
- */
-export function updateTransaction(serverId, t, action) {
+export function updateTransaction(serverId, transaction, action) {
   return apiRequest(`/api/transactions/${serverId}`, {
     method: 'PUT',
-    json: {
-      date: t.date,
-      time: t.time ?? null,
-      storeName: t.merchant,
-      amount: t.amountKrw,
-      direction: t.direction === 'in' ? '입금' : '출금',
-      type: t.kind,
-      category: t.category,
-      action,
-    },
+    json: toTransactionRequest(transaction, action),
   })
 }

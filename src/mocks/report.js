@@ -99,7 +99,7 @@ export function createMockReport({ snapshot, analysis, rows }) {
   }
 }
 
-// Figma S08 전용 합성 예시다. 현재 캡처·snapshot·정기결제 탐지 결과로 사용하지 않는다.
+// Figma S08 전용 합성 예시다. 현재 파일·snapshot·정기결제 탐지 결과로 사용하지 않는다.
 export const S08_PREVIEW_REPORT = {
   periodLabel: '8~10월 업로드 기록',
   totalKrw: 1243500,

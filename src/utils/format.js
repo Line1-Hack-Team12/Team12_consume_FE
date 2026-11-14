@@ -11,6 +11,7 @@ export function formatKRW(value) {
 
 /** '2026-09-07' → '09.07' */
 export function formatShortDate(date) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date ?? '')) return '날짜 없음'
   const [, m, d] = date.split('-')
   return `${m}.${d}`
 }
@@ -19,6 +20,7 @@ const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
 
 /** '2026-09-10' → '09.10 (목)' */
 export function formatDateWithWeekday(date) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date ?? '')) return '날짜 없음'
   const [y, m, d] = date.split('-').map(Number)
   const weekday = WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]
   return `${formatShortDate(date)} (${weekday})`

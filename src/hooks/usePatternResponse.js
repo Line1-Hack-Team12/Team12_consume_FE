@@ -50,6 +50,7 @@ export default function usePatternResponse({ pattern, snapshotId, designPreview 
     setReminderEnabled(enabled) {
       const current = latest()
       if (!key) return false
+      if (pattern?.mode === 'server') return false // 카드별 규칙 생성 계약 전에는 로컬 성공 처리하지 않는다.
       if (!enabled) {
         store.disableReminder(key, initial)
         return true

@@ -1,48 +1,33 @@
 import { useEffect, useRef, useState } from 'react'
 
-const TERMINAL = ['succeeded', 'partial', 'failed']
+const TERMINAL = ['succeeded', 'partial', 'failed', 'no_transactions']
 
-/**
- * job 상태 폴링 · 명세: 2초 간격, 오류 시 최대 10초까지 backoff, 화면 이탈 시 정리
- * @param {string|null} jobId
- * @param {(jobId: string) => Promise<object>} fetchJob  job 상태를 돌려주는 함수 (현재는 mocks)
- */
 export default function useJobPolling(jobId, fetchJob, { interval = 2000, maxBackoff = 10000 } = {}) {
-  const [job, setJob] = useState(null)
-  const [error, setError] = useState(null)
+  const [result, setResult] = useState({ key: null, job: null, error: null, polls: 0 })
   const fetchRef = useRef(fetchJob)
-
-  useEffect(() => {
-    fetchRef.current = fetchJob
-  })
-
+  useEffect(() => { fetchRef.current = fetchJob })
   useEffect(() => {
     if (!jobId) return undefined
     let cancelled = false
     let timer
     let delay = interval
-
+    let polls = 0
     const tick = async () => {
       try {
-        const next = await fetchRef.current(jobId)
+        const job = await fetchRef.current(jobId)
         if (cancelled) return
-        setJob(next)
-        setError(null)
+        setResult({ key: jobId, job, error: null, polls: ++polls })
         delay = interval
-        if (!TERMINAL.includes(next.state)) timer = setTimeout(tick, delay)
-      } catch (err) {
+        if (!TERMINAL.includes(job.state)) timer = setTimeout(tick, delay)
+      } catch (error) {
         if (cancelled) return
-        setError(err)
+        setResult((previous) => ({ key: jobId, job: previous.key === jobId ? previous.job : null, error, polls: ++polls }))
         delay = Math.min(delay * 2, maxBackoff)
         timer = setTimeout(tick, delay)
       }
     }
     timer = setTimeout(tick, 0)
-    return () => {
-      cancelled = true
-      clearTimeout(timer)
-    }
+    return () => { cancelled = true; clearTimeout(timer) }
   }, [jobId, interval, maxBackoff])
-
-  return { job, error }
+  return result.key === jobId ? result : { job: null, error: null, polls: 0 }
 }
