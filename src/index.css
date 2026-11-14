@@ -112,4 +112,10 @@
   input {
     font: inherit;
   }
+  :where(button, a[href], summary, select, [role="button"], input:is([type="button"], [type="submit"], [type="reset"], [type="checkbox"], [type="radio"], [type="range"], [type="file"])):not(:disabled):not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+  :where(button, a[href], summary, select, input, [role="button"]):is(:disabled, [aria-disabled="true"]) {
+    cursor: not-allowed;
+  }
 }
