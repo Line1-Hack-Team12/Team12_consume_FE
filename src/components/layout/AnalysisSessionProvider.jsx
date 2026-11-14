@@ -5,6 +5,7 @@ import * as sessionApi from '../../api/sessions'
 import { DEFAULT_MONTH_COUNT, DEFAULT_TONE } from '../../constants/limits'
 import { buildSlots } from '../../utils/months'
 import { regenerateNarratives, savePatternResponse } from '../../api/analysis'
+import { saveTransactionEdit } from '../../api/transactionEdits'
 import { AnalysisSessionContext } from '../../hooks/analysisSessionContext'
 import { createPatternResponseStore } from '../../mocks/patternResponses'
 import { createSavingsPlanStore } from '../../mocks/plans'
@@ -142,10 +143,6 @@ export default function AnalysisSessionProvider({ children }) {
       if (!before || savingRef.current) return false
       if (USE_MOCK) { dispatch({ type: 'updateTransaction', id, patch }); return true }
       if (!before.serverId) return false
-      if (['subcategory', 'slotMonth'].some((key) => key in patch && (patch[key] ?? null) !== (before[key] ?? null)) || ('time' in patch && before.time && !patch.time)) {
-        reportError(new Error('하위 분류·기록 월 변경과 기존 시각 삭제는 아직 저장할 수 없어요. 입력은 유지했으니 기존 값으로 되돌리거나 나중에 다시 저장해 주세요.'))
-        return false
-      }
       savingRef.current = true
       setSyncBusy(true)
       dispatch({ type: 'syncError', value: null })
@@ -153,13 +150,7 @@ export default function AnalysisSessionProvider({ children }) {
       const action = patch.included === false ? 'EXCLUDE' : patch.included === true && !before.included ? 'RESTORE' : patch.reviewStatus === 'kept' ? 'KEEP' : 'EDIT'
       const sessionId = stateRef.current.sessionId
       try {
-          const result = await sessionApi.updateTransaction(before.serverId, next, action)
-          const changedFields = ['direction', 'kind', 'category', 'subcategory', 'slotMonth'].filter((key) => (next[key] ?? null) !== (before[key] ?? null))
-          if (changedFields.length) {
-            const saved = await sessionApi.getTransaction(before.serverId)
-            const actual = { ...saved, kind: saved.kind ?? saved.type, direction: ['입금', 'in'].includes(saved.direction) ? 'in' : ['출금', 'out'].includes(saved.direction) ? 'out' : 'unknown' }
-            if (changedFields.some((key) => (actual[key] ?? null) !== (next[key] ?? null))) throw new Error('서버에서 수정 내용을 반영하지 못했어요. 입력은 유지했으니 다시 저장해 주세요.')
-          }
+          const result = await saveTransactionEdit(before, next, action)
           const rows = stateRef.current.draft.transactions.map((t) => t.id === id ? next : t)
           const queue = rows.filter((t) => t.reviewReasons.length > 0)
           if (queue.length > 0 && queue.every((t) => t.reviewStatus !== 'pending') && before.reviewStatus === 'pending') {

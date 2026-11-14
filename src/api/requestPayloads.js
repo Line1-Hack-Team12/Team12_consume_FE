@@ -26,7 +26,8 @@ export function toSessionQuery(settings, assets, consent) {
 export function toTransactionRequest(transaction, action) {
   return {
     date: transaction.date,
-    time: transaction.time || undefined,
+    // 백엔드는 null을 변경 없음으로 처리하므로 빈 문자열로 기존 시각을 지운다.
+    time: transaction.time || '',
     storeName: transaction.merchant,
     amount: transaction.amountKrw,
     direction: transaction.direction === 'in' ? '입금' : transaction.direction === 'out' ? '출금' : 'unknown',
