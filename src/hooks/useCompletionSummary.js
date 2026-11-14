@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
-import { getCompletionSummary } from '../api/analysis'
+import { useCallback, useMemo, useSyncExternalStore } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { completionSummaryQuery } from '../api/sessionQueries'
 import { S10_PREVIEW_PLAN } from '../mocks/completionPreview'
 import { createInitialPatternResponse } from '../mocks/patternResponses'
 import { createCompletionSnapshotReader, summarizeCompletion } from '../utils/completionSummary'
@@ -7,15 +8,12 @@ import { useAnalysisSession } from './analysisSessionContext'
 
 export default function useCompletionSummary({ result, designPreview = false }) {
   const { snapshot, analysis, patternResponseStore, savingsPlanStore } = useAnalysisSession()
-  const [serverSummary, setServerSummary] = useState(null)
-  const [serverError, setServerError] = useState('')
-  const [attempt, setAttempt] = useState(0)
-  useEffect(() => {
-    if (result?.mode !== 'server') return
-    let active = true
-    getCompletionSummary(snapshot.sessionId).then((value) => { if (active) { setServerSummary({ ...value, snapshotId: result.snapshotId }); setServerError('') } }, (err) => { if (active) setServerError(err.message) })
-    return () => { active = false }
-  }, [result?.mode, result?.snapshotId, snapshot?.sessionId, attempt])
+  const summaryQuery = useQuery({
+    ...completionSummaryQuery(snapshot?.sessionId, result?.snapshotId),
+    enabled: result?.mode === 'server' && snapshot?.sessionId != null && snapshot?.id === result?.snapshotId,
+  })
+  const serverSummary = summaryQuery.data
+  const serverError = summaryQuery.error?.message ?? ''
   const preview = import.meta.env.DEV && designPreview
   const valid = Boolean(result && Array.isArray(result.patterns) && (preview
     || (snapshot?.id === result.snapshotId && analysis?.snapshotId === result.snapshotId)))
@@ -51,7 +49,7 @@ export default function useCompletionSummary({ result, designPreview = false }) 
     planReminderCount: 0,
     selectedPlanText: serverSummary?.selectedPlanSummary,
     selectedPlan: null, hasUnsavedResponses: local.hasUnsavedResponses, unsavedPatternIds: local.unsavedPatternIds,
-    loading: serverSummary?.snapshotId !== result.snapshotId && !serverError, error: serverError, retry: () => setAttempt((n) => n + 1),
+    loading: summaryQuery.isPending && !serverError, error: serverError, retry: summaryQuery.refetch,
   }
   return local
 }

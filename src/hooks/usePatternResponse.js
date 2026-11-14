@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { invalidateSessionQueries } from '../api/sessionQueries'
 import { CAUSE_TAGS, MAX_CUSTOM_CAUSE_LENGTH, RESPONSE_STATUSES } from '../constants/patternResponses'
 import { isValidReminderTime } from '../constants/reminders'
 import { createInitialPatternResponse } from '../mocks/patternResponses'
@@ -6,6 +8,7 @@ import { useAnalysisSession } from './analysisSessionContext'
 
 export default function usePatternResponse({ pattern, snapshotId, designPreview = false }) {
   const { snapshot, analysis, patternResponseStore: store } = useAnalysisSession()
+  const queryClient = useQueryClient()
   const preview = import.meta.env.DEV && designPreview
   const valid = Boolean(pattern && (preview || (snapshot?.id === snapshotId && analysis?.snapshotId === snapshotId && analysis.patterns.some((item) => item.id === pattern.id))))
   const key = valid ? `${preview ? 'preview' : 'snapshot'}:${snapshotId}:${pattern.id}` : null
@@ -19,7 +22,14 @@ export default function usePatternResponse({ pattern, snapshotId, designPreview 
     ? !response.custom_cause.trim() ? '직접 입력한 이유를 적어 주세요.' : response.custom_cause.length > MAX_CUSTOM_CAUSE_LENGTH ? `직접 입력은 ${MAX_CUSTOM_CAUSE_LENGTH}자까지 가능해요.` : ''
     : ''
 
-  const save = useCallback(() => key ? store.save(key, initial, pattern, { failureMode }) : Promise.resolve(true), [store, key, initial, pattern, failureMode])
+  const save = useCallback(async () => {
+    if (!key) return true
+    const saved = await store.save(key, initial, pattern, { failureMode })
+    if (saved && pattern?.mode === 'server') {
+      await invalidateSessionQueries(queryClient, snapshot?.sessionId, snapshotId, ['plans', 'notifications', 'completion'])
+    }
+    return saved
+  }, [store, key, initial, pattern, failureMode, queryClient, snapshot?.sessionId, snapshotId])
   useEffect(() => {
     if (valid && entry.dirty && !entry.saving && !entry.error && !customError) save()
   }, [valid, entry.dirty, entry.saving, entry.error, entry.editVersion, customError, save])

@@ -1,3 +1,5 @@
+import { useState } from 'react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createBrowserRouter, Navigate, Outlet, RouterProvider, useLocation } from 'react-router'
 import AnalysisSessionProvider from './components/layout/AnalysisSessionProvider'
 import NavigationProvider from './components/layout/NavigationProvider'
@@ -32,9 +34,12 @@ const router = createBrowserRouter([{
 }])
 
 export default function App() {
+  const [queryClient] = useState(() => new QueryClient())
   return (
-    <AnalysisSessionProvider>
-      <RouterProvider router={router} />
-    </AnalysisSessionProvider>
+    <QueryClientProvider client={queryClient}>
+      <AnalysisSessionProvider>
+        <RouterProvider router={router} />
+      </AnalysisSessionProvider>
+    </QueryClientProvider>
   )
 }

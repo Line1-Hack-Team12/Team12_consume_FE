@@ -31,7 +31,7 @@ export default function S06ReminderPage({ params }) {
     )
   }
 
-  if (validResult.mode === 'server') return <ServerReminderManager sessionId={snapshot.sessionId} />
+  if (validResult.mode === 'server') return <ServerReminderManager key={snapshot.id} sessionId={snapshot.sessionId} snapshotId={snapshot.id} />
 
   return <ReminderManager key={`${designPreview}:${validResult.snapshotId}`} result={validResult} designPreview={designPreview} />
 }
