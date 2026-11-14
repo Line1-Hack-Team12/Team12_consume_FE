@@ -4,7 +4,7 @@ const OLE_HEADER = [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]
 const ZIP_HEADER = [0x50, 0x4b, 0x03, 0x04]
 
 export const REJECT_REASON = {
-  imageType: '보조 내역은 JPG·PNG·WebP 캡처로 추가해 주세요',
+  imageType: '보조 내역은 JPG·JPEG·PNG·WebP 캡처로 추가해 주세요',
   bankType: '토스뱅크에서 발급한 .xlsx 거래내역 파일을 선택해 주세요',
   size: '보조 내역은 파일당 10MB까지 올릴 수 있어요',
   bankSize: '거래내역 파일은 20MB까지 올릴 수 있어요',
