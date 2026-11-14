@@ -4,12 +4,10 @@ export const DEFAULT_MONTH_COUNT = 3
 export const SELECTABLE_MONTH_RANGE = 12 // 마지막 달 드롭다운에 보여줄 과거 개월 수
 
 export const MAX_FILES_PER_UPLOAD = 10
-export const MAX_FILE_BYTES = 10 * 1024 * 1024 // 보조 캡처·PDF
+export const MAX_FILE_BYTES = 10 * 1024 * 1024 // 보조 캡처
 export const MAX_BANK_FILE_BYTES = 20 * 1024 * 1024
 export const IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 export const IMAGE_ACCEPT_ATTR = '.jpg,.jpeg,.png,.webp,' + IMAGE_MIME_TYPES.join(',')
-export const PDF_MIME_TYPE = 'application/pdf'
-export const SUPPLEMENT_ACCEPT_ATTR = `${IMAGE_ACCEPT_ATTR},.pdf,${PDF_MIME_TYPE}`
 export const BANK_FILE_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 export const BANK_ACCEPT_ATTR = `.xlsx,${BANK_FILE_MIME}`
 

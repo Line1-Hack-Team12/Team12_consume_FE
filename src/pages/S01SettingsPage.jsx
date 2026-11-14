@@ -13,7 +13,7 @@ import { SCREEN } from '../constants/screens'
 import { useAnalysisSession } from '../hooks/analysisSessionContext'
 import { useAppNavigation } from '../hooks/navigationContext'
 import { USE_MOCK } from '../api/config'
-import { appendFiles, createSession, unsupportedSessionInput } from '../api/sessions'
+import { createSession, unsupportedSessionInput } from '../api/sessions'
 import { startExtractionJob } from '../mocks/jobs'
 import { buildSlots, formatMonth, getSelectableMonths, isSelectableLastMonth } from '../utils/months'
 import SlotCard from './S01/SlotCard'
@@ -46,7 +46,6 @@ export default function S01SettingsPage() {
   const [uploadError, setUploadError] = useState('')
   const [checkingCount, setCheckingCount] = useState(0)
   const uploading = useRef(false)
-  const uploaded = useRef({ signature: '', sessionId: null, ids: new Set() })
   const onCheckingChange = (delta) => setCheckingCount((n) => n + delta)
 
   const monthOptions = useMemo(() => getSelectableMonths().map((m) => ({ value: m, label: formatMonth(m) })), [])
@@ -89,23 +88,9 @@ export default function S01SettingsPage() {
         clearFilePasswords()
         navigate(SCREEN.S02, { jobId })
       } else {
-        // 동의 후에만 서버로 보낸다 (F02)
-        const signature = JSON.stringify([settings, assets.map((a) => a.id)])
-        if (uploaded.current.signature !== signature) uploaded.current = { signature, sessionId: null, ids: new Set() }
-        const progress = uploaded.current
-        const batches = [...acceptedBank.map((file) => [file]), ...(captures.length ? [captures] : [])]
-        for (const batch of batches) {
-          const pending = batch.filter((a) => !progress.ids.has(a.id))
-          if (!pending.length) continue
-          if (progress.sessionId) await appendFiles(progress.sessionId, { settings, assets: pending, consent })
-          else {
-            progress.sessionId = await createSession({ settings, assets: pending, consent })
-            setSessionId(progress.sessionId)
-          }
-          pending.forEach((a) => progress.ids.add(a.id))
-          pending.filter((a) => a.kind === 'file').forEach((a) => setBankPassword(a.id, ''))
-        }
-        const sessionId = progress.sessionId
+        // 동의 후 엑셀과 보조 캡처를 하나의 요청으로 함께 보낸다 (F02)
+        const sessionId = await createSession({ settings, assets, consent })
+        setSessionId(sessionId)
         clearFilePasswords()
         navigate(SCREEN.S02, { sessionId })
       }
@@ -168,6 +153,7 @@ export default function S01SettingsPage() {
 
       <Section title="은행 거래내역 파일" description=".xlsx · 파일당 20MB · 동의 후 선택한 기간의 거래만 읽어요">
         <SlotCard kind="file" files={bankFiles} disabled={!lastMonthValid} onAdd={addBankFiles} onRemove={removeBankFile} onPasswordChange={setBankPassword} onCheckingChange={onCheckingChange} />
+        {acceptedBank.length > 1 && !USE_MOCK ? <Note tone="gray">함께 올리는 엑셀 파일의 열기 암호는 같아야 해요. 암호가 없는 파일은 입력란을 비워 두세요.</Note> : null}
         <details className="text-caption text-ink-2">
           <summary className="min-h-11 cursor-pointer py-3 text-brand">토스뱅크에서 엑셀로 내보내는 방법</summary>
           <p>토스 앱 → 토스뱅크 계좌 → 관리 → 문서 → 거래내역서 → 엑셀을 선택해 발급해 주세요. 발급한 파일에 열기 암호가 있으면 함께 입력해 주세요.</p>
@@ -175,7 +161,7 @@ export default function S01SettingsPage() {
         {acceptedBank.length > 0 ? <Note tone="gray">파일의 월별 건수는 동의 후 읽기가 끝나면 확인할 수 있어요. 여러 달이 든 파일은 한 번만 추가해 주세요.</Note> : null}
       </Section>
 
-      <Section title="캡처·PDF로 추가하기 · 보조" description="간편결제·카드사 내역용 · 회당 10개 · 파일당 10MB · JPG/PNG/WebP/PDF">
+      <Section title="캡처로 추가하기 · 보조" description="간편결제·카드사 내역용 · 회당 10개 · 파일당 10MB · JPG/PNG/WebP">
         {slots.length === 0 ? (
           <Note tone="gray">마지막 달을 고르면 파일을 넣을 칸이 생겨요.</Note>
         ) : (

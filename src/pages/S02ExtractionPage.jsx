@@ -123,10 +123,9 @@ export default function S02ExtractionPage({ params }) {
   const completed = assets.filter((a) => ['succeeded', 'failed', 'skipped'].includes(a.status)).length
   const progress = finished ? 1 : assets.length ? Math.min(0.95, completed / assets.length * 0.6 + current / 4 * 0.4) : 0
   const hasBank = bankFiles.some((f) => f.status === 'accepted')
-  const hasDocument = hasBank || originals.some((file) => file.kind === 'pdf' && file.status === 'accepted')
 
   return <ScreenLayout showBack={false}
-    title={noTransactions ? '결제 내역을 찾지 못했어요' : failed.length ? '읽지 못한 내역을 확인해 주세요' : hasDocument ? '거래내역을 읽고 있어요' : '캡처를 읽고 있어요'}
+    title={noTransactions ? '결제 내역을 찾지 못했어요' : failed.length ? '읽지 못한 내역을 확인해 주세요' : hasBank ? '거래내역을 읽고 있어요' : '캡처를 읽고 있어요'}
     description={noTransactions ? '거래 날짜와 금액이 있는 내역 파일이나 캡처로 교체해 주세요.' : '읽기가 끝나면 내역을 검토하는 화면으로 이동해요.'}
     footer={<>
       {actionError ? <p role="alert" className="text-caption text-danger-ink">{actionError}</p> : null}
@@ -139,7 +138,7 @@ export default function S02ExtractionPage({ params }) {
     <section className="flex flex-col gap-3 rounded-2xl bg-surface p-4" aria-live="polite">
       <p className="text-body-b">{completed} / {assets.length || '–'}개 확인</p>
       <ProgressBar value={progress} label="전체 진행" />
-      <Stepper steps={STAGES.map((label, i) => ({ label: i === 0 ? hasDocument ? '거래내역 읽기' : '캡처 읽기' : label, status: i < current ? 'done' : i === current ? 'run' : 'todo' }))} />
+      <Stepper steps={STAGES.map((label, i) => ({ label: i === 0 ? hasBank ? '거래내역 읽기' : '캡처 읽기' : label, status: i < current ? 'done' : i === current ? 'run' : 'todo' }))} />
     </section>
     <ul className="flex flex-col gap-3">
       {assets.map((asset) => <li key={asset.assetId} className="min-w-0 rounded-xl bg-surface p-3">

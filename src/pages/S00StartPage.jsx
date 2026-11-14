@@ -25,7 +25,7 @@ export default function S00StartPage() {
           <br />
           찾아보세요
         </h1>
-        <p className="text-body text-ink-2">은행 거래내역 엑셀이나 결제 내역 캡처·PDF를 올리면, 같은 상황에서 반복된 지출과 그 뒤에 따라온 비용까지 보여드려요.</p>
+        <p className="text-body text-ink-2">은행 거래내역 엑셀이나 결제 내역 캡처를 올리면, 같은 상황에서 반복된 지출과 그 뒤에 따라온 비용까지 보여드려요.</p>
       </div>
 
       <ul className="flex flex-col gap-3">

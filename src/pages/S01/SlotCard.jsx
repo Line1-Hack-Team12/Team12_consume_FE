@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import Icon from '../../components/ui/Icon'
 import { TextField } from '../../components/ui/Field'
-import { BANK_ACCEPT_ATTR, SUPPLEMENT_ACCEPT_ATTR } from '../../constants/limits'
+import { BANK_ACCEPT_ATTR, IMAGE_ACCEPT_ATTR } from '../../constants/limits'
 import { validateFiles } from '../../utils/fileValidation'
 import { formatMonth } from '../../utils/months'
 import CapturePreviewDialog from './CapturePreviewDialog'
@@ -48,7 +48,7 @@ export default function SlotCard({ month, files, disabled, onAdd, onRemove, kind
       <div className="flex items-center gap-2.5">
         <h3 className="flex-1 text-body-b">{title}</h3>
         <span className={`text-caption-m ${accepted.length ? 'text-brand' : 'text-ink-3'}`}>{accepted.length}개</span>
-        <input id={inputId} type="file" accept={isBank ? BANK_ACCEPT_ATTR : SUPPLEMENT_ACCEPT_ATTR} multiple className="peer sr-only" disabled={disabled || checking} onChange={handleChange} />
+        <input id={inputId} type="file" accept={isBank ? BANK_ACCEPT_ATTR : IMAGE_ACCEPT_ATTR} multiple className="peer sr-only" disabled={disabled || checking} onChange={handleChange} />
         <label
           htmlFor={inputId}
           className={`inline-flex min-h-11 shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-caption-m peer-focus-visible:outline-2 peer-focus-visible:outline-brand ${
@@ -56,7 +56,7 @@ export default function SlotCard({ month, files, disabled, onAdd, onRemove, kind
           }`}
         >
           <Icon name="plus" size={14} />
-          {checking ? '확인 중…' : isBank ? '파일 추가' : '캡처·PDF 추가'}
+          {checking ? '확인 중…' : isBank ? '파일 추가' : '캡처 추가'}
           <span className="sr-only">· {title}</span>
         </label>
       </div>
@@ -65,7 +65,7 @@ export default function SlotCard({ month, files, disabled, onAdd, onRemove, kind
         <ul className="flex flex-col gap-2" aria-label={`${title} 선택한 파일`}>
           {accepted.map((f) => (
             <li key={f.id} className="flex min-w-0 flex-wrap items-center gap-2 rounded-xl bg-subtle px-3 py-2">
-              {isBank || f.kind === 'pdf' ? <Icon name="file" size={22} className="text-brand" /> : <CaptureThumbnail file={f} onClick={() => setPreviewFile(f)} />}
+              {isBank ? <Icon name="file" size={22} className="text-brand" /> : <CaptureThumbnail file={f} onClick={() => setPreviewFile(f)} />}
               <div className="min-w-0 flex-1">
                 <p className="truncate text-caption-m" title={f.name}>{f.name}</p>
                 <p className="text-caption text-ink-3">
@@ -91,7 +91,7 @@ export default function SlotCard({ month, files, disabled, onAdd, onRemove, kind
           ))}
         </ul>
       ) : (
-        <p className="text-caption text-ink-3">{isBank ? '.xlsx · 파일당 20MB · 여러 달을 한 번에 올릴 수 있어요.' : '간편결제·카드사 내역을 캡처 또는 PDF로 추가할 수 있어요.'}</p>
+        <p className="text-caption text-ink-3">{isBank ? '.xlsx · 파일당 20MB · 여러 달을 한 번에 올릴 수 있어요.' : '간편결제·카드사 내역을 JPG·PNG·WebP 캡처로 추가할 수 있어요.'}</p>
       )}
 
       {rejected.length > 0 ? (

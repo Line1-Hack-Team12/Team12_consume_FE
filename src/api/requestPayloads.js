@@ -3,6 +3,14 @@ const PERSONA = { coach: 'COACH', friend: 'FRIEND', grandma: 'GRANDMOTHER' }
 
 export const toSlotMonths = (settings, assets) => assets.map((asset) => asset.slotMonth ?? settings.lastMonth)
 
+export function toFileUploadQuery(settings, assets) {
+  return {
+    slotMonths: toSlotMonths(settings, assets),
+    ownerName: settings.ownerName?.trim() || undefined,
+    filePassword: assets.find((asset) => asset.kind === 'file' && asset.password)?.password || undefined,
+  }
+}
+
 export function toSessionQuery(settings, assets, consent) {
   return {
     monthsCount: settings.monthCount,
@@ -11,7 +19,7 @@ export function toSessionQuery(settings, assets, consent) {
     payday: settings.payday ? Number(settings.payday) : undefined,
     persona: PERSONA[settings.tone] ?? 'COACH',
     aiConsent: consent,
-    slotMonths: toSlotMonths(settings, assets),
+    ...toFileUploadQuery(settings, assets),
   }
 }
 
