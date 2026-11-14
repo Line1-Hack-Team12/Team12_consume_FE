@@ -166,7 +166,7 @@ export default function S01SettingsPage() {
         />
       </Section>
 
-      <Section title="은행 거래내역 파일" description="토스뱅크 .xlsx · 파일당 20MB · 동의 후 선택한 기간의 거래만 읽어요">
+      <Section title="은행 거래내역 파일" description=".xlsx · 파일당 20MB · 동의 후 선택한 기간의 거래만 읽어요">
         <SlotCard kind="file" files={bankFiles} disabled={!lastMonthValid} onAdd={addBankFiles} onRemove={removeBankFile} onPasswordChange={setBankPassword} onCheckingChange={onCheckingChange} />
         <details className="text-caption text-ink-2">
           <summary className="min-h-11 cursor-pointer py-3 text-brand">토스뱅크에서 엑셀로 내보내는 방법</summary>

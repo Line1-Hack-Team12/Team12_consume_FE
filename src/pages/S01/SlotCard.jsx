@@ -91,7 +91,7 @@ export default function SlotCard({ month, files, disabled, onAdd, onRemove, kind
           ))}
         </ul>
       ) : (
-        <p className="text-caption text-ink-3">{isBank ? '토스뱅크 .xlsx · 파일당 20MB · 여러 달을 한 번에 올릴 수 있어요.' : '간편결제·카드사 내역을 캡처로 추가할 수 있어요.'}</p>
+        <p className="text-caption text-ink-3">{isBank ? '.xlsx · 파일당 20MB · 여러 달을 한 번에 올릴 수 있어요.' : '간편결제·카드사 내역을 캡처로 추가할 수 있어요.'}</p>
       )}
 
       {rejected.length > 0 ? (
