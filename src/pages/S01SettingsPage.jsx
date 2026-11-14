@@ -175,7 +175,7 @@ export default function S01SettingsPage() {
         {acceptedBank.length > 0 ? <Note tone="gray">파일의 월별 건수는 동의 후 읽기가 끝나면 확인할 수 있어요. 여러 달이 든 파일은 한 번만 추가해 주세요.</Note> : null}
       </Section>
 
-      <Section title="캡처로 추가하기 · 보조" description="간편결제·카드사 앱용 · 회당 10장 · 장당 10MB · JPG/PNG/WebP">
+      <Section title="캡처·PDF로 추가하기 · 보조" description="간편결제·카드사 내역용 · 회당 10개 · 파일당 10MB · JPG/PNG/WebP/PDF">
         {slots.length === 0 ? (
           <Note tone="gray">마지막 달을 고르면 파일을 넣을 칸이 생겨요.</Note>
         ) : (
