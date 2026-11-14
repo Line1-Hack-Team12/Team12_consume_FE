@@ -35,10 +35,20 @@ export function appendFiles(sessionId, input) {
 }
 
 export const getSessionStatus = (sessionId, opts) => apiRequest(`/api/sessions/${sessionId}/status`, opts)
-// Swagger는 JSON 안의 files를 binary로 선언한다. 실제 바이너리 인코딩/전송 방식 확정 전에는 성공으로 간주하지 않는다.
-export const CAN_RETRY_WITH_FILES = false
-export function retryFailedFiles() {
-  throw new Error('파일을 다시 읽는 기능은 아직 준비 중이에요. 파일 교체하기로 다시 올려 주세요.')
+// 백엔드 retryFailed의 @RequestPart("files")에 원본을 다시 첨부한다.
+// 파일을 생략하면 실제 추출 없이 상태만 바꾸는 별도 분기로 들어가므로 빈 요청은 막는다.
+export function retryFailedFiles(sessionId, fileIds, input) {
+  if (!Array.isArray(fileIds) || !fileIds.length || fileIds.length !== input.assets.length
+    || fileIds.some((id) => id == null || id === '') || new Set(fileIds.map(String)).size !== fileIds.length
+    || input.assets.some((asset) => !(asset.file instanceof Blob) || !asset.file.size)) {
+    throw new Error('다시 읽을 원본을 확인할 수 없어요. 파일 교체를 선택해 주세요.')
+  }
+  const { ownerName, filePassword } = toFileUploadQuery(input.settings, input.assets)
+  return apiRequest(`/api/sessions/${sessionId}/retry-failed`, {
+    method: 'POST',
+    form: uploadForm(input),
+    query: { fileIds, ownerName, filePassword },
+  })
 }
 export const resetForReplace = (sessionId) => apiRequest(`/api/sessions/${sessionId}/reset-for-replace`, { method: 'POST' })
 export const proceedPartial = (sessionId) => apiRequest(`/api/sessions/${sessionId}/proceed-partial`, { method: 'POST' })

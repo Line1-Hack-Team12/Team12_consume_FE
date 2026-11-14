@@ -3,6 +3,7 @@ import { CATEGORIES, KINDS } from '../constants/limits.js'
 const STAGES = ['reading', 'classifying', 'deduplicating', 'preliminary_detecting']
 const normalize = (value) => String(value ?? '').toLowerCase()
 const terminal = ['succeeded', 'partial', 'failed', 'no_transactions']
+const canRetryFile = (file) => file.retryable ?? !['UNSUPPORTED_FORMAT', 'OUTPUT_TRUNCATED', 'REFUSED'].includes(String(file.errorCode ?? '').toUpperCase())
 
 export function toExtractionJob(status) {
   const failedById = new Map((status.failedFiles ?? []).map((f) => [String(f.fileId), f]))
@@ -17,15 +18,17 @@ export function toExtractionJob(status) {
           : code === 'queued' || text.includes('대기') ? 'queued' : 'running'
     return { assetId: id, name: f.name ?? f.fileName, slotMonth: f.slotMonth ?? failed?.slotMonth, kind: f.kind,
       status: state, reason: f.reason ?? failed?.reason ?? f.errorMessage, errorCode: f.errorCode ?? failed?.errorCode,
-      retryable: f.retryable ?? failed?.retryable ?? !['PASSWORD_REQUIRED', 'INVALID_PASSWORD', 'UNSUPPORTED_FORMAT', 'OUTPUT_TRUNCATED', 'REFUSED'].includes(f.errorCode ?? failed?.errorCode) }
+      retryable: canRetryFile({ ...failed, ...f, retryable: f.retryable ?? failed?.retryable, errorCode: f.errorCode ?? failed?.errorCode }) }
   })
   for (const f of status.failedFiles ?? []) {
-    if (!perAsset.some((a) => String(a.assetId) === String(f.fileId))) perAsset.push({ assetId: f.fileId, name: f.fileName, slotMonth: f.slotMonth, status: 'failed', reason: f.reason, errorCode: f.errorCode, retryable: f.retryable ?? true })
+    if (!perAsset.some((a) => String(a.assetId) === String(f.fileId))) perAsset.push({ assetId: f.fileId, name: f.fileName, kind: f.kind, slotMonth: f.slotMonth, status: 'failed', reason: f.reason, errorCode: f.errorCode, retryable: canRetryFile(f) })
   }
   const code = normalize(status.state ?? status.status)
   let state = terminal.includes(code) ? code : 'running'
   if (['reviewing', 'completed'].includes(code)) state = 'succeeded'
   if (code === 'partial_failed') state = perAsset.some((a) => a.status === 'succeeded') ? 'partial' : 'failed'
+  // 암호가 다른 파일을 나눠 재시도한 뒤에도 남아 있는 실패를 숨기지 않는다.
+  if (state === 'succeeded' && perAsset.some((a) => a.status === 'failed')) state = perAsset.some((a) => a.status === 'succeeded') ? 'partial' : 'failed'
   if (perAsset.length && perAsset.every((a) => a.status === 'skipped')) state = 'no_transactions'
   const running = (status.steps ?? []).find((s) => s.status === 'IN_PROGRESS')
   return { state, stage: terminal.includes(state) ? null : status.stage ?? STAGES[Math.min(4, Math.max(1, running?.stepNumber ?? status.currentStep ?? 1)) - 1],

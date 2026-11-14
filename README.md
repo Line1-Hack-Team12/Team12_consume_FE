@@ -14,6 +14,7 @@ npm run dev
 | 명령 | 용도 |
 |---|---|
 | `npm run lint` | ESLint 검사 |
+| `npm test` | 실패 파일 재시도 회귀 테스트 |
 | `npm run build` | 프로덕션 빌드 |
 | `npm run preview` | 빌드 결과 확인 |
 
