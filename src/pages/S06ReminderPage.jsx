@@ -7,7 +7,7 @@ import Chip from '../components/ui/Chip'
 import Note from '../components/ui/Note'
 import { SCREEN } from '../constants/screens'
 import { useAnalysisSession } from '../hooks/analysisSessionContext'
-import { useNavigation } from '../hooks/navigationContext'
+import { useAppNavigation } from '../hooks/navigationContext'
 import { createInitialPatternResponse } from '../mocks/patternResponses'
 import { S05_PREVIEW_ANALYSIS } from '../mocks/s05Preview'
 import ReminderSettings from './S06/ReminderSettings'
@@ -15,7 +15,7 @@ import ReminderSettings from './S06/ReminderSettings'
 // F14. 규칙 설정은 기존 카드 응답과 공유하고, 발송·스케줄은 연결하지 않는다.
 export default function S06ReminderPage({ params }) {
   const { snapshot, analysis } = useAnalysisSession()
-  const { navigate } = useNavigation()
+  const { navigate } = useAppNavigation()
   const designPreview = import.meta.env.DEV && new URLSearchParams(window.location.search).get('demo') === 's05'
   const result = designPreview ? S05_PREVIEW_ANALYSIS : snapshot && analysis?.snapshotId === snapshot.id ? analysis : null
   const validResult = !params?.snapshotId || params.snapshotId === result?.snapshotId ? result : null
@@ -33,7 +33,7 @@ export default function S06ReminderPage({ params }) {
 }
 
 function ReminderManager({ result, designPreview }) {
-  const { navigate, back: goBack } = useNavigation()
+  const { navigate, back: goBack } = useAppNavigation()
   const { settings, patternResponseStore: store } = useAnalysisSession()
   const rules = result.patterns.filter((pattern) => pattern.reminderSuggestion)
   const prefix = `${designPreview ? 'preview' : 'snapshot'}:${result.snapshotId}:`

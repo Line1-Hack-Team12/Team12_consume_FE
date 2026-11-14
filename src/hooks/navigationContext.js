@@ -1,18 +1,17 @@
 import { createContext, useContext } from 'react'
 
 /**
- * 화면 전환 컨텍스트 · 라우터 없이 화면 ID로 이동한다.
+ * React Router를 화면 ID 기반 호출과 연결하는 앱 전용 컨텍스트.
  * - current: { id, params, key } · key는 화면 방문을 구분한다.
- * - navigate(id, params?, { replace?, skipBlocker? })
- * - back(fallbackId?, { skipBlocker? }): 브라우저 뒤로 가기. 첫 화면이면 fallbackId로 이동한다.
- * - blockNavigation(blocker): 이동 전 확인을 등록한다. blocker는 승인 후 실행할 proceed를 받으며, 반환 함수로 등록을 해제한다.
+ * - navigate(id, params?, { replace? }): 매개변수를 URL 쿼리에도 기록한다.
+ * - back(fallbackId?): 앱 내 이전 기록이 없으면 fallbackId로 이동한다.
  * - getViewState(key) / saveViewState(key, state): 화면 방문별 UI 상태를 현재 탭의 메모리에서 읽고 쓴다.
- * URL 해시(#/S01)와 동기화되므로 새로고침·브라우저 뒤로 가기에서도 같은 화면이 열린다.
+ * 이동 차단은 편집 화면의 React Router useBlocker가 담당한다.
  */
 export const NavigationContext = createContext(null)
 
-export function useNavigation() {
+export function useAppNavigation() {
   const ctx = useContext(NavigationContext)
-  if (!ctx) throw new Error('useNavigation은 NavigationProvider 안에서만 쓸 수 있어요')
+  if (!ctx) throw new Error('useAppNavigation은 NavigationProvider 안에서만 쓸 수 있어요')
   return ctx
 }

@@ -8,7 +8,7 @@ import Note from '../../components/ui/Note'
 import Toggle from '../../components/ui/Toggle'
 import { REMINDER_TIME_OPTIONS, isValidReminderTime, validateReminderTime } from '../../constants/reminders'
 import { SCREEN } from '../../constants/screens'
-import { useNavigation } from '../../hooks/navigationContext'
+import { useAppNavigation } from '../../hooks/navigationContext'
 import usePatternResponse from '../../hooks/usePatternResponse'
 import { buildS06ReminderPreview } from '../../mocks/reminders'
 import DemoReminderDialog from './DemoReminderDialog'
@@ -20,7 +20,7 @@ function Condition({ label, children }) {
 }
 
 export default function ReminderSettings({ pattern, snapshotId, designPreview, tone, disabled }) {
-  const { navigate } = useNavigation()
+  const { navigate } = useAppNavigation()
   const { response, saving, error, customError, setReminderEnabled, setReminderTime, retry } = usePatternResponse({ pattern, snapshotId, designPreview })
   const [demoOpen, setDemoOpen] = useState(false)
   const [timeError, setTimeError] = useState('')

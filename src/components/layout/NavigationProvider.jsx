@@ -1,40 +1,40 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { SCREEN, SCREEN_IDS } from '../../constants/screens'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { useLocation, useNavigate } from 'react-router'
+import { SCREEN, SCREEN_PATHS } from '../../constants/screens'
 import { NavigationContext } from '../../hooks/navigationContext'
 
-function readHash() {
-  const id = decodeURIComponent(window.location.hash.replace(/^#\/?/, ''))
-  return SCREEN_IDS.includes(id) ? id : null
-}
-
-function initialEntry(initialId) {
-  const fromState = window.history.state
-  if (fromState?.screen && SCREEN_IDS.includes(fromState.screen.id)) {
-    return { ...fromState.screen, key: fromState.screen.key ?? crypto.randomUUID() }
-  }
-  return { id: readHash() ?? initialId, params: {}, depth: 0, key: crypto.randomUUID() }
-}
-
-export default function NavigationProvider({ initialId = SCREEN.S00, children }) {
-  const [current, setCurrent] = useState(() => initialEntry(initialId))
-  const currentRef = useRef(current)
-  const blockerRef = useRef(null)
-  const restoringPopRef = useRef(null)
-  const skipNextPopRef = useRef(false)
+// URL과 이동 기록은 React Router가 관리하고, 목록 UI 상태만 메모리에 보관한다.
+export default function NavigationProvider({ children }) {
+  const location = useLocation()
+  const routerNavigate = useNavigate()
   const viewStatesRef = useRef(new Map())
+  const activeKeyRef = useRef(location.key)
   const previousFocusRef = useRef(null)
 
-  // 화면 방문별 UI 상태만 메모리에 보관한다. 새로고침 후에는 복원하지 않는다.
+  const current = useMemo(() => {
+    const params = { ...Object.fromEntries(new URLSearchParams(location.search)), ...location.state?.params }
+    if (params.index !== undefined) params.index = Math.max(0, Number.parseInt(params.index, 10) || 0)
+    const pathname = location.pathname.replace(/\/+$/, '').toLowerCase()
+    const id = Object.keys(SCREEN_PATHS).find((key) => SCREEN_PATHS[key].toLowerCase() === pathname)
+      ?? location.pathname.slice(1)
+    return { id, params, key: location.key }
+  }, [location])
+
   const getViewState = useCallback((key) => viewStatesRef.current.get(key), [])
   const saveViewState = useCallback((key, state) => {
     viewStatesRef.current.set(key, state)
   }, [])
+  const isCurrentView = useCallback((key) => activeKeyRef.current === key, [])
 
-  const blockNavigation = useCallback((blocker) => {
-    blockerRef.current = blocker
-    return () => {
-      if (blockerRef.current === blocker) blockerRef.current = null
-    }
+  useLayoutEffect(() => {
+    activeKeyRef.current = location.key
+    if (!viewStatesRef.current.has(location.key)) window.scrollTo(0, 0)
+  }, [location.key])
+
+  useEffect(() => {
+    const previousRestoration = window.history.scrollRestoration
+    window.history.scrollRestoration = 'manual'
+    return () => { window.history.scrollRestoration = previousRestoration }
   }, [])
 
   useEffect(() => {
@@ -42,107 +42,39 @@ export default function NavigationProvider({ initialId = SCREEN.S00, children })
       const main = document.querySelector('main')
       const previousFocus = previousFocusRef.current
       previousFocusRef.current = null
-      // 목록 복귀나 대화상자에서 이미 정한 포커스는 그대로 둔다.
       if (document.querySelector('dialog[open]')) return
       if (main?.contains(document.activeElement) && document.activeElement !== previousFocus) return
       main?.querySelector('h1')?.focus({ preventScroll: true })
     })
     return () => cancelAnimationFrame(frame)
-  }, [current.key])
+  }, [location.key])
 
-  useEffect(() => {
-    const previousRestoration = window.history.scrollRestoration
-    // 목록 DOM이 다시 그려진 뒤 각 화면에서 스크롤 위치를 복원한다.
-    window.history.scrollRestoration = 'manual'
-    window.history.replaceState({ screen: currentRef.current }, '', `#/${currentRef.current.id}`)
-    const onPop = (e) => {
-      const entry = initialEntry(initialId)
-      if (!e.state?.screen?.key) {
-        window.history.replaceState({ screen: entry }, '', `#/${entry.id}`)
-      }
-      const previous = currentRef.current
-      const delta = previous.depth - entry.depth
-
-      // 브라우저 이동을 되돌리는 동안에는 현재 화면과 입력값을 유지한다.
-      if (restoringPopRef.current) {
-        if (delta !== 0) {
-          window.history.go(delta)
-          return
-        }
-        const pending = restoringPopRef.current
-        restoringPopRef.current = null
-        pending.blocker(pending.proceed)
-        return
-      }
-
-      if (skipNextPopRef.current) {
-        skipNextPopRef.current = false
-      } else if (blockerRef.current) {
-        if (delta !== 0) {
-          restoringPopRef.current = {
-            blocker: blockerRef.current,
-            proceed: () => {
-              skipNextPopRef.current = true
-              window.history.go(-delta)
-            },
-          }
-          window.history.go(delta)
-        } else {
-          window.history.replaceState({ screen: previous }, '', `#/${previous.id}`)
-          blockerRef.current(() => {
-            previousFocusRef.current = document.activeElement
-            window.history.replaceState({ screen: entry }, '', `#/${entry.id}`)
-            currentRef.current = entry
-            setCurrent(entry)
-            window.scrollTo(0, 0)
-          })
-        }
-        return
-      }
-      previousFocusRef.current = document.activeElement
-      currentRef.current = entry
-      setCurrent(entry)
-      window.scrollTo(0, 0)
+  const navigate = useCallback((id, params = {}, { replace = false } = {}) => {
+    previousFocusRef.current = document.activeElement
+    const search = new URLSearchParams()
+    // 시연 모드는 화면 이동·새로고침 후에도 유지한다.
+    const currentSearch = new URLSearchParams(location.search)
+    for (const key of ['mock', 'demo', 'responseDemo', 'planDemo']) {
+      if (currentSearch.has(key)) search.set(key, currentSearch.get(key))
     }
-    window.addEventListener('popstate', onPop)
-    return () => {
-      window.removeEventListener('popstate', onPop)
-      window.history.scrollRestoration = previousRestoration
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== null) search.set(key, String(value))
     }
-  }, [initialId])
+    return routerNavigate({ pathname: SCREEN_PATHS[id] ?? `/${id}`, search: search.toString() }, {
+      replace,
+      state: { params, depth: (location.state?.depth ?? 0) + (replace ? 0 : 1) },
+    })
+  }, [routerNavigate, location.state, location.search])
 
-  const navigate = useCallback((id, params = {}, { replace = false, skipBlocker = false } = {}) => {
-    const proceed = () => {
-      previousFocusRef.current = document.activeElement
-      const prev = currentRef.current
-      const entry = { id, params, depth: replace ? prev.depth : prev.depth + 1, key: crypto.randomUUID() }
-      if (replace) window.history.replaceState({ screen: entry }, '', `#/${id}`)
-      else window.history.pushState({ screen: entry }, '', `#/${id}`)
-      currentRef.current = entry
-      setCurrent(entry)
-      window.scrollTo(0, 0)
-    }
-    if (!skipBlocker && blockerRef.current) blockerRef.current(proceed)
-    else proceed()
-  }, [])
-
-  const back = useCallback(
-    (fallbackId = SCREEN.S00, { skipBlocker = false } = {}) => {
-      const proceed = () => {
-        if (currentRef.current.depth > 0) {
-          skipNextPopRef.current = true
-          window.history.back()
-        } else navigate(fallbackId, {}, { replace: true, skipBlocker: true })
-      }
-      if (!skipBlocker && blockerRef.current) blockerRef.current(proceed)
-      else proceed()
-    },
-    [navigate],
-  )
+  const back = useCallback((fallbackId = SCREEN.S00) => {
+    previousFocusRef.current = document.activeElement
+    if ((location.state?.depth ?? 0) > 0) return routerNavigate(-1)
+    return navigate(fallbackId, {}, { replace: true })
+  }, [routerNavigate, location.state, navigate])
 
   const value = useMemo(
-    () => ({ current, navigate, back, blockNavigation, getViewState, saveViewState }),
-    [current, navigate, back, blockNavigation, getViewState, saveViewState],
+    () => ({ current, navigate, back, getViewState, saveViewState, isCurrentView }),
+    [current, navigate, back, getViewState, saveViewState, isCurrentView],
   )
   return <NavigationContext.Provider value={value}>{children}</NavigationContext.Provider>
 }

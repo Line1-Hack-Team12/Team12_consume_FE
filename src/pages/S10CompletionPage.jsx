@@ -7,7 +7,7 @@ import IconBox from '../components/ui/IconBox'
 import Note from '../components/ui/Note'
 import { SCREEN } from '../constants/screens'
 import { useAnalysisSession } from '../hooks/analysisSessionContext'
-import { useNavigation } from '../hooks/navigationContext'
+import { useAppNavigation } from '../hooks/navigationContext'
 import useCompletionSummary from '../hooks/useCompletionSummary'
 import { S05_PREVIEW_ANALYSIS } from '../mocks/s05Preview'
 import { formatKRW, formatNumber } from '../utils/format'
@@ -21,7 +21,7 @@ function SummaryRow({ label, children }) {
 
 // S10은 현재 확정 기록의 선택 상태를 요약한다. 절감 성과나 변화 추적 결과를 생성하지 않는다.
 export default function S10CompletionPage({ params }) {
-  const { navigate } = useNavigation()
+  const { navigate } = useAppNavigation()
   const { snapshot, analysis } = useAnalysisSession()
   const designPreview = import.meta.env.DEV && new URLSearchParams(window.location.search).get('demo') === 's05'
   const result = designPreview ? S05_PREVIEW_ANALYSIS : snapshot && analysis?.snapshotId === snapshot.id ? analysis : null

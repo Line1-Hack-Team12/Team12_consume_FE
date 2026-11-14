@@ -11,7 +11,7 @@ import Segmented from '../components/ui/Segmented'
 import { MONTH_COUNTS, PAYDAY_OPTIONS, REGIONS, TONES } from '../constants/limits'
 import { SCREEN } from '../constants/screens'
 import { useAnalysisSession } from '../hooks/analysisSessionContext'
-import { useNavigation } from '../hooks/navigationContext'
+import { useAppNavigation } from '../hooks/navigationContext'
 import { USE_MOCK } from '../api/config'
 import { createSession } from '../api/sessions'
 import { startExtractionJob } from '../mocks/jobs'
@@ -38,7 +38,7 @@ function Section({ title, description, children }) {
 
 // S01 설정하고 캡처 올리기 (F01·F02)
 export default function S01SettingsPage() {
-  const { navigate } = useNavigation()
+  const { navigate } = useAppNavigation()
   const { settings, files, consent, updateSettings, addFiles, removeFile, setConsent, setSessionId } = useAnalysisSession()
   const [confirmEmpty, setConfirmEmpty] = useState(false)
   const [starting, setStarting] = useState(false)

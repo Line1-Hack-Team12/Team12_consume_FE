@@ -9,7 +9,7 @@ import Note from '../components/ui/Note'
 import { SCREEN } from '../constants/screens'
 import { MIN_PLAN_GOAL_KRW } from '../constants/plans'
 import { useAnalysisSession } from '../hooks/analysisSessionContext'
-import { useNavigation } from '../hooks/navigationContext'
+import { useAppNavigation } from '../hooks/navigationContext'
 import useSavingsPlan from '../hooks/useSavingsPlan'
 import { S05_PREVIEW_ANALYSIS } from '../mocks/s05Preview'
 import { formatKRW } from '../utils/format'
@@ -19,7 +19,7 @@ import SavingsPlanCard from './S09/SavingsPlanCard'
 // S09 저축 플랜 (F17). 절감액·가능 최대치·조합은 목업 응답을 그대로 표시한다.
 export default function S09SavingsPlanPage({ params }) {
   const mounted = useRef(false)
-  const { navigate } = useNavigation()
+  const { navigate } = useAppNavigation()
   const { snapshot, analysis } = useAnalysisSession()
   const designPreview = import.meta.env.DEV && new URLSearchParams(window.location.search).get('demo') === 's05'
   const result = designPreview ? S05_PREVIEW_ANALYSIS : snapshot && analysis?.snapshotId === snapshot.id ? analysis : null

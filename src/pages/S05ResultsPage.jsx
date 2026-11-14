@@ -11,7 +11,7 @@ import SummaryCard from '../components/ui/SummaryCard'
 import { TONES } from '../constants/limits'
 import { SCREEN } from '../constants/screens'
 import { useAnalysisSession } from '../hooks/analysisSessionContext'
-import { useNavigation } from '../hooks/navigationContext'
+import { useAppNavigation } from '../hooks/navigationContext'
 import { S05_PREVIEW_ANALYSIS } from '../mocks/s05Preview'
 import { formatKRW } from '../utils/format'
 import { formatShortMonth } from '../utils/months'
@@ -20,7 +20,7 @@ import PatternCard from './S05/PatternCard'
 
 // S05 결과 홈 (F10·F12·F16). 실제 결과는 확정 snapshot과 연결된 analysis만 사용한다.
 export default function S05ResultsPage() {
-  const { navigate } = useNavigation()
+  const { navigate } = useAppNavigation()
   const { settings, snapshot, analysis, updateSettings } = useAnalysisSession()
   const [lockedPattern, setLockedPattern] = useState(null)
   const designPreview = import.meta.env.DEV && new URLSearchParams(window.location.search).get('demo') === 's05'

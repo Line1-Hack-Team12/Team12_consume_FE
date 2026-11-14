@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useBlocker } from 'react-router'
 import ScreenLayout from '../components/layout/ScreenLayout'
 import Button from '../components/ui/Button'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
@@ -7,7 +8,7 @@ import Note from '../components/ui/Note'
 import { CATEGORIES, DIRECTIONS, KINDS } from '../constants/limits'
 import { SCREEN } from '../constants/screens'
 import { useAnalysisSession } from '../hooks/analysisSessionContext'
-import { useNavigation } from '../hooks/navigationContext'
+import { useAppNavigation } from '../hooks/navigationContext'
 import { formatNumber } from '../utils/format'
 import { validateTransaction } from '../utils/transactionValidation'
 
@@ -18,30 +19,29 @@ function lastDay(month) {
 
 // S03-E 내역 수정하기
 export default function S03EditPage({ params }) {
-  const { back, blockNavigation } = useNavigation()
+  const { back } = useAppNavigation()
   const { draft, updateTransaction } = useAnalysisSession()
   const original = draft?.transactions.find((t) => t.id === params?.id)
   const [form, setForm] = useState(() => (original ? { ...original, amountText: formatNumber(original.amountKrw) } : null))
   const [showErrors, setShowErrors] = useState(false)
-  const [pendingLeave, setPendingLeave] = useState(null)
+  const allowLeaveRef = useRef(false)
   const hasChanges = Boolean(original && form && (
     form.amountText !== formatNumber(original.amountKrw)
     || ['date', 'time', 'merchant', 'direction', 'kind', 'category', 'subcategory'].some((key) => (form[key] ?? '') !== (original[key] ?? ''))
   ))
+  const blocker = useBlocker(() => hasChanges && !allowLeaveRef.current)
 
   useEffect(() => {
     if (!hasChanges) return undefined
-    const unblock = blockNavigation((proceed) => setPendingLeave(() => proceed))
     const onBeforeUnload = (event) => {
       event.preventDefault()
       event.returnValue = ''
     }
     window.addEventListener('beforeunload', onBeforeUnload)
     return () => {
-      unblock()
       window.removeEventListener('beforeunload', onBeforeUnload)
     }
-  }, [hasChanges, blockNavigation])
+  }, [hasChanges])
 
   if (!original || !form) {
     return (
@@ -57,7 +57,10 @@ export default function S03EditPage({ params }) {
   const hasErrors = Object.keys(errors).length > 0
   const subs = CATEGORIES.find((c) => c.value === form.category)?.subs ?? []
   const set = (patch) => setForm((f) => ({ ...f, ...patch }))
-  const done = () => back(SCREEN.S03, { skipBlocker: true })
+  const done = () => {
+    allowLeaveRef.current = true
+    back(SCREEN.S03)
+  }
 
   const save = () => {
     if (hasErrors) {
@@ -165,17 +168,13 @@ export default function S03EditPage({ params }) {
         </Note>
       ) : null}
       <ConfirmDialog
-        open={Boolean(pendingLeave)}
+        open={blocker.state === 'blocked'}
         title="수정 중인 내역이 있어요"
         confirmLabel="계속 수정"
         cancelLabel="변경 내용 버리기"
-        onConfirm={() => setPendingLeave(null)}
-        onCancel={() => {
-          const proceed = pendingLeave
-          setPendingLeave(null)
-          proceed?.()
-        }}
-        onDismiss={() => setPendingLeave(null)}
+        onConfirm={() => blocker.reset?.()}
+        onCancel={() => blocker.proceed?.()}
+        onDismiss={() => blocker.reset?.()}
       >
         저장하지 않고 나가면 변경 내용이 사라져요.
       </ConfirmDialog>

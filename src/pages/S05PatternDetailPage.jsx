@@ -8,7 +8,7 @@ import Card from '../components/ui/Card'
 import Note from '../components/ui/Note'
 import { SCREEN } from '../constants/screens'
 import { useAnalysisSession } from '../hooks/analysisSessionContext'
-import { useNavigation } from '../hooks/navigationContext'
+import { useAppNavigation } from '../hooks/navigationContext'
 import usePatternResponse from '../hooks/usePatternResponse'
 import { S05_PREVIEW_ANALYSIS } from '../mocks/s05Preview'
 import CauseResponseCard from './S05Detail/CauseResponseCard'
@@ -18,7 +18,7 @@ import ReminderCard from './S05Detail/ReminderCard'
 
 // S05-1 카드 상세 (F12·F13·F14). 수치와 거래 근거는 선택한 분석 결과만 사용한다.
 export default function S05PatternDetailPage({ params }) {
-  const { navigate } = useNavigation()
+  const { navigate } = useAppNavigation()
   const { settings, snapshot, analysis } = useAnalysisSession()
   const [leaving, setLeaving] = useState(false)
   const designPreview = import.meta.env.DEV && new URLSearchParams(window.location.search).get('demo') === 's05'

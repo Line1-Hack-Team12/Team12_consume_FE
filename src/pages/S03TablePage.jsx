@@ -6,7 +6,7 @@ import Note from '../components/ui/Note'
 import { CATEGORIES, DIRECTIONS } from '../constants/limits'
 import { SCREEN } from '../constants/screens'
 import { useAnalysisSession } from '../hooks/analysisSessionContext'
-import { useNavigation } from '../hooks/navigationContext'
+import { useAppNavigation } from '../hooks/navigationContext'
 import { summarizeDraft } from '../mocks/draft'
 import { formatKRW, formatShortDate } from '../utils/format'
 import { formatSlotRange } from '../utils/months'
@@ -17,7 +17,7 @@ const labelOf = (list, v) => list.find((x) => x.value === v)?.label ?? v
 
 // S03-T 전체 내역 수정하기 · 모바일은 행 카드, 날짜순 10건씩
 export default function S03TablePage() {
-  const { current, navigate, back, getViewState, saveViewState } = useNavigation()
+  const { current, navigate, back, getViewState, saveViewState, isCurrentView } = useAppNavigation()
   const { draft } = useAnalysisSession()
   const [shown, setShown] = useState(() => getViewState(current.key)?.shown ?? PAGE)
   const listRef = useRef(null)
@@ -39,14 +39,14 @@ export default function S03TablePage() {
     if (!hasDraft) return undefined
     const rememberPosition = () => {
       // 이동 직후 발생한 이전 화면의 scroll 이벤트가 복귀 위치를 덮어쓰지 않게 한다.
-      if (window.history.state?.screen?.key !== current.key) return
+      if (!isCurrentView(current.key)) return
       const focusId = getViewState(current.key)?.focusId
       saveViewState(current.key, { shown, scrollX: window.scrollX, scrollY: window.scrollY, focusId })
     }
     rememberPosition()
     window.addEventListener('scroll', rememberPosition, { passive: true })
     return () => window.removeEventListener('scroll', rememberPosition)
-  }, [current.key, hasDraft, shown, getViewState, saveViewState])
+  }, [current.key, hasDraft, shown, getViewState, saveViewState, isCurrentView])
 
   if (!draft) {
     return (

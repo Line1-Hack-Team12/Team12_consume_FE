@@ -2,7 +2,7 @@ import ScreenLayout from '../components/layout/ScreenLayout'
 import Button from '../components/ui/Button'
 import IconBox from '../components/ui/IconBox'
 import { SCREEN } from '../constants/screens'
-import { useNavigation } from '../hooks/navigationContext'
+import { useAppNavigation } from '../hooks/navigationContext'
 
 const FEATURES = [
   { icon: 'image', tone: 'brand', title: '캡처 몇 장으로 시작', body: '거래를 정리하고, 반복되는 상황을 찾아드려요.' },
@@ -12,7 +12,7 @@ const FEATURES = [
 
 // S00 시작
 export default function S00StartPage() {
-  const { navigate } = useNavigation()
+  const { navigate } = useAppNavigation()
   return (
     <ScreenLayout
       showBack={false}

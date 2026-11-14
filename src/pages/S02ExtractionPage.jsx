@@ -8,7 +8,7 @@ import ProgressBar from '../components/ui/ProgressBar'
 import Stepper from '../components/ui/Stepper'
 import { SCREEN } from '../constants/screens'
 import { useAnalysisSession } from '../hooks/analysisSessionContext'
-import { useNavigation } from '../hooks/navigationContext'
+import { useAppNavigation } from '../hooks/navigationContext'
 import useJobPolling from '../hooks/useJobPolling'
 import { toExtractionJob } from '../api/adapters'
 import { USE_MOCK } from '../api/config'
@@ -44,7 +44,7 @@ const FILE_STATUS = {
 
 // S02 캡처를 읽고 있어요 · partial/failed는 같은 화면에서 E04 상태로 보여준다
 export default function S02ExtractionPage({ params }) {
-  const { navigate } = useNavigation()
+  const { navigate } = useAppNavigation()
   const { setDraft, sessionId: contextSessionId, loadDraftFromServer } = useAnalysisSession()
   const sessionId = params?.sessionId ?? (USE_MOCK ? null : contextSessionId)
   const [mockJobId, setMockJobId] = useState(params?.jobId ?? null)

@@ -2,11 +2,11 @@ import ScreenLayout from '../components/layout/ScreenLayout'
 import Button from '../components/ui/Button'
 import Note from '../components/ui/Note'
 import { SCREEN } from '../constants/screens'
-import { useNavigation } from '../hooks/navigationContext'
+import { useAppNavigation } from '../hooks/navigationContext'
 
 // 아직 구현하지 않은 화면 ID로 이동했을 때 보여주는 임시 화면
 export default function PlaceholderPage({ screenId }) {
-  const { navigate } = useNavigation()
+  const { navigate } = useAppNavigation()
   return (
     <ScreenLayout
       title={`${screenId} 화면 준비 중`}

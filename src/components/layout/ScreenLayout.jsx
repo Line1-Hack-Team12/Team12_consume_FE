@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { useNavigation } from '../../hooks/navigationContext'
+import { useAppNavigation } from '../../hooks/navigationContext'
 import Icon from '../ui/Icon'
 
 /**
@@ -21,7 +21,7 @@ export default function ScreenLayout({
   contentClassName = '',
   children,
 }) {
-  const { back } = useNavigation()
+  const { back } = useAppNavigation()
   const screenRef = useRef(null)
   const footerRef = useRef(null)
 

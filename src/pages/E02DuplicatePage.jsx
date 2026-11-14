@@ -5,12 +5,12 @@ import Note from '../components/ui/Note'
 import { DIRECTIONS } from '../constants/limits'
 import { SCREEN } from '../constants/screens'
 import { useAnalysisSession } from '../hooks/analysisSessionContext'
-import { useNavigation } from '../hooks/navigationContext'
+import { useAppNavigation } from '../hooks/navigationContext'
 import { formatKRW, formatShortDate } from '../utils/format'
 
 // E02 중복 후보 확인 (F05) · 기본 merge, separate면 둘 다 포함. 어느 쪽도 영구 삭제하지 않는다.
 export default function E02DuplicatePage({ params }) {
-  const { navigate, back } = useNavigation()
+  const { navigate, back } = useAppNavigation()
   const { draft, setDuplicateDecision } = useAnalysisSession()
   const groups = draft?.duplicateGroups ?? []
   const index = Math.min(params?.index ?? 0, Math.max(0, groups.length - 1))

@@ -5,7 +5,7 @@ import Note from '../components/ui/Note'
 import Stepper from '../components/ui/Stepper'
 import { SCREEN } from '../constants/screens'
 import { useAnalysisSession } from '../hooks/analysisSessionContext'
-import { useNavigation } from '../hooks/navigationContext'
+import { useAppNavigation } from '../hooks/navigationContext'
 import useJobPolling from '../hooks/useJobPolling'
 import { toAnalysisJob } from '../api/adapters'
 import { USE_MOCK } from '../api/config'
@@ -26,7 +26,7 @@ const TONE_LABEL = { coach: '코치', friend: '친구', grandma: '할머니' }
 
 // S03-P 확정 후 최종 분석 · snapshot으로만 분석하고 끝나면 S05로 간다
 export default function S03FinalizingPage() {
-  const { navigate } = useNavigation()
+  const { navigate } = useAppNavigation()
   const { snapshot, settings, setAnalysis } = useAnalysisSession()
   const [mockJobId, setJobId] = useState(null)
   // API 모드: 확정(POST /confirm) 뒤 GET /analysis/status 를 폴링한다

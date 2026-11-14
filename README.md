@@ -2,7 +2,7 @@
 
 결제 내역 캡처를 바탕으로 반복 지출 습관과 직접·후속 비용을 보여주는 모바일 웹 서비스다.
 
-React + Vite + JavaScript + Tailwind CSS를 사용한다. 현재는 Vite 템플릿과 기본 폴더 구조가 준비된 단계다.
+React + Vite + JavaScript + Tailwind CSS와 React Router를 사용한다.
 
 ## 실행과 검증
 
@@ -17,12 +17,18 @@ npm run dev
 | `npm run build` | 프로덕션 빌드 |
 | `npm run preview` | 빌드 결과 확인 |
 
+`createBrowserRouter`로 해시 없는 주소를 사용한다. 페이지 파일명의 화면 번호와 `Page`를 빼므로 `S00StartPage`는 `/Start`, `S01SettingsPage`는 `/Settings`, `S05PatternDetailPage`는 `/PatternDetail`이다. 전체 매핑은 `src/constants/screens.js`의 `SCREEN_PATHS`에서 관리한다.
+
+이전 `/S00`, `#/S00`, `#/Start` 같은 주소로 접속하면 새 주소로 이동하며, 상세 화면의 쿼리도 유지한다. 시연 모드는 `/Results?mock=1&demo=s05`처럼 지정하며 화면 이동 후에도 유지된다.
+
+Vercel은 `/api/...`를 백엔드로 전달하고 나머지 화면 경로는 `index.html`로 연결한다. 다른 호스팅에서도 화면 주소 직접 접속과 새로고침을 위해 SPA fallback 설정이 필요하다. 분석 데이터 자체는 메모리 상태이므로 새로고침 시 자동 복원되지는 않는다.
+
 ## 파일 구조
 
 ```text
 src/
 ├─ main.jsx       # React 진입점
-├─ App.jsx        # 앱 조립 위치, 현재 템플릿 화면
+├─ App.jsx        # 분석 Provider와 React Router 라우트 구성
 ├─ index.css      # Tailwind 진입점과 전역 스타일
 ├─ App.css        # 기존 템플릿 스타일
 ├─ pages/         # 화면 단위 조립과 전환 연결

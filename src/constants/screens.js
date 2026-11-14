@@ -21,3 +21,22 @@ export const SCREEN = {
 }
 
 export const SCREEN_IDS = Object.values(SCREEN)
+
+// 페이지 파일명에서 화면 번호와 Page를 뺀 URL 이름.
+export const SCREEN_PATHS = {
+  [SCREEN.S00]: '/Start',
+  [SCREEN.S01]: '/Settings',
+  [SCREEN.S02]: '/Extraction',
+  [SCREEN.S03]: '/Review',
+  [SCREEN.S03_E]: '/Edit',
+  [SCREEN.S03_T]: '/Table',
+  [SCREEN.S03_P]: '/Finalizing',
+  [SCREEN.E02]: '/Duplicate',
+  [SCREEN.S05]: '/Results',
+  [SCREEN.S05_1]: '/PatternDetail',
+  [SCREEN.S06]: '/Reminder',
+  [SCREEN.S08]: '/Report',
+  [SCREEN.S09]: '/SavingsPlan',
+  [SCREEN.S10]: '/Completion',
+  [SCREEN.S11]: '/Comparison',
+}

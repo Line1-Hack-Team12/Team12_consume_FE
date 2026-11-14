@@ -9,7 +9,7 @@ import Note from '../components/ui/Note'
 import SummaryCard from '../components/ui/SummaryCard'
 import { SCREEN } from '../constants/screens'
 import { useAnalysisSession } from '../hooks/analysisSessionContext'
-import { useNavigation } from '../hooks/navigationContext'
+import { useAppNavigation } from '../hooks/navigationContext'
 import { REVIEW_REASON_LABEL, summarizeDraft } from '../mocks/draft'
 import { formatKRW, formatShortDate } from '../utils/format'
 import { formatSlotRange } from '../utils/months'
@@ -21,7 +21,7 @@ const EXPAND_QUEUE_THRESHOLD = 5
 
 // S03 읽어온 숫자 확인 · 검토 큐를 모두 처리하면 같은 화면이 S03-R(확인 완료) 상태가 된다
 export default function S03ReviewPage() {
-  const { navigate } = useNavigation()
+  const { navigate } = useAppNavigation()
   const { draft, confirmed, setConfirmed, updateTransaction, setSnapshot, confirmReview, sessionId, syncError, clearSyncError } = useAnalysisSession()
   const [confirming, setConfirming] = useState(false)
   const [confirmError, setConfirmError] = useState('')

@@ -7,7 +7,7 @@ import Card from '../components/ui/Card'
 import Note from '../components/ui/Note'
 import { SCREEN } from '../constants/screens'
 import { useAnalysisSession } from '../hooks/analysisSessionContext'
-import { useNavigation } from '../hooks/navigationContext'
+import { useAppNavigation } from '../hooks/navigationContext'
 import { S11_PREVIEW } from '../mocks/s11Preview'
 
 function ComparisonRow({ period }) {
@@ -27,7 +27,7 @@ function ComparisonRow({ period }) {
 
 // S11은 독립된 발표용 화면이다. 합성 예시를 조회할 때 세션 상태를 변경하거나 저장하지 않는다.
 export default function S11ComparisonPage() {
-  const { navigate, back } = useNavigation()
+  const { navigate, back } = useAppNavigation()
   const { snapshot, analysis } = useAnalysisSession()
   const designPreview = import.meta.env.DEV && new URLSearchParams(window.location.search).get('demo') === 's05'
   const canReturnToCompletion = designPreview || Boolean(snapshot && analysis?.snapshotId === snapshot.id)

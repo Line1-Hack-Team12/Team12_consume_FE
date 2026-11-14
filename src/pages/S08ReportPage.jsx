@@ -7,7 +7,7 @@ import SummaryCard from '../components/ui/SummaryCard'
 import { DEFAULT_TONE, TONES } from '../constants/limits'
 import { SCREEN } from '../constants/screens'
 import { useAnalysisSession } from '../hooks/analysisSessionContext'
-import { useNavigation } from '../hooks/navigationContext'
+import { useAppNavigation } from '../hooks/navigationContext'
 import { S05_PREVIEW_ANALYSIS } from '../mocks/s05Preview'
 import { formatKRW } from '../utils/format'
 import CategoryShareCard from './S08/CategoryShareCard'
@@ -17,7 +17,7 @@ import RecurringPaymentsCard from './S08/RecurringPaymentsCard'
 
 // F15·F16·F18. 확정 분석 응답을 표시하며, 화면에서 거래를 다시 집계하거나 탐지하지 않는다.
 export default function S08ReportPage({ params }) {
-  const { navigate } = useNavigation()
+  const { navigate } = useAppNavigation()
   const { settings, snapshot, analysis } = useAnalysisSession()
   const designPreview = import.meta.env.DEV && new URLSearchParams(window.location.search).get('demo') === 's05'
   const result = designPreview ? S05_PREVIEW_ANALYSIS : snapshot && analysis?.snapshotId === snapshot.id ? analysis : null
