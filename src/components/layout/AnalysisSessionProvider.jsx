@@ -60,7 +60,13 @@ function reducer(state, action) {
       const duplicateGroups = state.draft.duplicateGroups.map((g) =>
         g.id === action.id ? { ...g, decision: action.decision, reviewed: true } : g,
       )
-      return { ...state, draft: { ...state.draft, duplicateGroups, revision: action.revision ?? (state.draft.revision == null ? null : state.draft.revision + 1) }, confirmed: false, snapshot: null, analysis: null }
+      const group = duplicateGroups.find((g) => g.id === action.id)
+      // separate는 원본 거래를 각각 복원한다. merge는 원본을 삭제하지 않고 합계에서만 묶는다.
+      const transactions = action.decision === 'separate'
+        ? state.draft.transactions.map((t) => group.memberIds.includes(t.id) && !t.included
+          ? { ...t, included: true, reviewStatus: t.reviewReasons.length ? 'pending' : 'ok' } : t)
+        : state.draft.transactions
+      return { ...state, draft: { ...state.draft, transactions, duplicateGroups, revision: action.revision ?? (state.draft.revision == null ? null : state.draft.revision + 1) }, confirmed: false, snapshot: null, analysis: null }
     }
     case 'confirmed':
       return { ...state, confirmed: action.value }

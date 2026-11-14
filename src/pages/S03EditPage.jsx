@@ -28,7 +28,7 @@ export default function S03EditPage({ params }) {
   const allowLeaveRef = useRef(false)
   const hasChanges = Boolean(original && form && (
     form.amountText !== formatNumber(original.amountKrw)
-    || ['date', 'time', 'merchant', 'direction', 'kind', 'category', 'subcategory'].some((key) => (form[key] ?? '') !== (original[key] ?? ''))
+    || ['date', 'time', 'merchant', 'direction', 'kind', 'category', 'subcategory', 'slotMonth'].some((key) => (form[key] ?? '') !== (original[key] ?? ''))
   ))
   const blocker = useBlocker(() => hasChanges && !allowLeaveRef.current)
 
@@ -70,7 +70,7 @@ export default function S03EditPage({ params }) {
     }
     const rest = { ...candidate }
     delete rest.amountText
-    if (await updateTransaction(original.id, { ...rest, included: true, reviewStatus: original.reviewReasons.length ? 'edited' : original.reviewStatus })) done()
+    if (await updateTransaction(original.id, { ...rest, included: original.included, reviewStatus: original.included ? (original.reviewReasons.length ? 'edited' : original.reviewStatus) : 'excluded' })) done()
   }
 
   const keepAsIs = async () => {
