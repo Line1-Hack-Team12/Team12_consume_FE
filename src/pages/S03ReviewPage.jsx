@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import ScreenLayout from '../components/layout/ScreenLayout'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
@@ -17,6 +17,7 @@ import { formatKRW, formatShortDate } from '../utils/format'
 import { formatSlotRange } from '../utils/months'
 import { isTransactionValid } from '../utils/transactionValidation'
 import { gateState, pendingQueue, reviewQueue } from './S03/reviewSelectors'
+import ConfirmationRecovery from './S03/ConfirmationRecovery'
 
 const VISIBLE_QUEUE = 3
 const EXPAND_QUEUE_THRESHOLD = 5
@@ -43,9 +44,10 @@ function MissingDateGroup({ rows, onUpdate, disabled }) {
 // S03 읽어온 숫자 확인 · 검토 큐를 모두 처리하면 같은 화면이 S03-R(확인 완료) 상태가 된다
 export default function S03ReviewPage() {
   const { navigate } = useAppNavigation()
-  const { draft, confirmed, setConfirmed, updateTransaction, setSnapshot, confirmReview, sessionId, syncError, syncBusy, clearSyncError } = useAnalysisSession()
+  const { draft, confirmed, setConfirmed, updateTransaction, setSnapshot, confirmReview, sessionId, syncError, syncBusy, clearSyncError, confirmationConflict, confirmationBackups, reloadAfterConflict } = useAnalysisSession()
   const [confirming, setConfirming] = useState(false)
   const [confirmError, setConfirmError] = useState('')
+  const confirmingRef = useRef(false)
 
   if (!draft) {
     return (
@@ -82,7 +84,8 @@ export default function S03ReviewPage() {
   const exclude = (t) => updateTransaction(t.id, { included: false, reviewStatus: 'excluded' })
 
   const confirm = async () => {
-    if (confirming || syncBusy || syncError || !confirmed || !gate.canConfirm) return
+    if (confirmingRef.current || syncBusy || syncError || confirmationConflict || !confirmed || !gate.canConfirm) return
+    confirmingRef.current = true
     setConfirming(true)
     setConfirmError('')
     let serverSnapshotId
@@ -99,10 +102,12 @@ export default function S03ReviewPage() {
       })
     } catch (err) {
       setConfirmError(err.message)
+      confirmingRef.current = false
       setConfirming(false)
       return
     }
     setConfirming(false)
+    confirmingRef.current = false
     navigate(SCREEN.S03_P, {}, { replace: true })
   }
 
@@ -111,22 +116,24 @@ export default function S03ReviewPage() {
       title={reviewDone ? '건수와 합계 확인 완료' : '읽어온 숫자 확인'}
       footer={
         <>
-          <Checkbox checked={confirmed} disabled={!gate.canConfirm || syncBusy || Boolean(syncError)} onChange={setConfirmed}>
+          <Checkbox checked={confirmed} disabled={!gate.canConfirm || syncBusy || Boolean(syncError) || Boolean(confirmationConflict)} onChange={setConfirmed}>
             건수와 합계를 확인했어요
           </Checkbox>
           {!gate.canConfirm ? <p className="text-caption text-ink-3">{gate.reason}</p> : null}
-          {confirmError ? <p role="alert" className="text-caption text-danger-ink">{confirmError}</p> : null}
-          <Button disabled={!confirmed || !gate.canConfirm || confirming || syncBusy || Boolean(syncError)} onClick={confirm}>
+          {confirmError && !confirmationConflict ? <p role="alert" className="text-caption text-danger-ink">{confirmError}</p> : null}
+          <Button disabled={!confirmed || !gate.canConfirm || confirming || syncBusy || Boolean(syncError) || Boolean(confirmationConflict)} onClick={confirm}>
             {confirming ? '확정하는 중…' : '계속 · 확정하고 분석'}
           </Button>
           {reviewDone ? (
-            <Button variant="secondary" onClick={() => navigate(SCREEN.S03_T)}>
+            <Button disabled={syncBusy || Boolean(confirmationConflict)} variant="secondary" onClick={() => navigate(SCREEN.S03_T)}>
               전체 표 다시 수정
             </Button>
           ) : null}
         </>
       }
     >
+      <ConfirmationRecovery draft={draft} conflict={confirmationConflict} backups={confirmationBackups} busy={syncBusy}
+        onReload={async () => { if (await reloadAfterConflict()) setConfirmError('') }} />
       {syncError ? (
         <Note tone="danger" icon="alert">
           <p>{syncError}</p>
@@ -161,7 +168,7 @@ export default function S03ReviewPage() {
             <h2 className="text-heading">확인이 필요한 행 {pending.length}개</h2>
             <Badge tone="coral">확인 필요</Badge>
           </div>
-          {dateGroups.map((rows) => <MissingDateGroup key={`${rows[0].sourceAssetId}:${rows.length}`} rows={rows} onUpdate={updateTransaction} disabled={syncBusy} />)}
+          {dateGroups.map((rows) => <MissingDateGroup key={`${rows[0].sourceAssetId}:${rows.length}`} rows={rows} onUpdate={updateTransaction} disabled={syncBusy || Boolean(confirmationConflict)} />)}
           <ul className="flex flex-col gap-2.5">
             {visibleQueue.map((t) => (
               <li key={t.id} className="flex flex-col gap-2.5 rounded-xl bg-canvas px-3.5 py-3">
@@ -178,13 +185,13 @@ export default function S03ReviewPage() {
                   </div>
                 </div>
                 <div className="flex gap-1.5">
-                  <Button size="sm" variant="tonal" onClick={() => navigate(SCREEN.S03_E, { id: t.id })}>
+                  <Button disabled={syncBusy || Boolean(confirmationConflict)} size="sm" variant="tonal" onClick={() => navigate(SCREEN.S03_E, { id: t.id })}>
                     수정
                   </Button>
-                  <Button disabled={syncBusy} size="sm" variant="secondary" onClick={() => keep(t)}>
+                  <Button disabled={syncBusy || Boolean(confirmationConflict)} size="sm" variant="secondary" onClick={() => keep(t)}>
                     그대로 두기
                   </Button>
-                  <Button disabled={syncBusy} size="sm" variant="secondary" onClick={() => exclude(t)}>
+                  <Button disabled={syncBusy || Boolean(confirmationConflict)} size="sm" variant="secondary" onClick={() => exclude(t)}>
                     제외
                   </Button>
                 </div>
@@ -203,14 +210,14 @@ export default function S03ReviewPage() {
               {mergedCount > 0 ? `중복 후보 ${dupCount}건 중 ${mergedCount}건을 같은 거래로 묶었어요` : `중복 후보 ${dupCount}건을 모두 따로 포함했어요`}
             </p>
           </div>
-          <Button variant="secondary" onClick={() => navigate(SCREEN.E02, { index: 0 })}>
+          <Button disabled={syncBusy || Boolean(confirmationConflict)} variant="secondary" onClick={() => navigate(SCREEN.E02, { index: 0 })}>
             펼쳐서 중복 확인
           </Button>
         </section>
       ) : null}
 
       {!reviewDone ? (
-        <Button variant="secondary" onClick={() => navigate(SCREEN.S03_T)}>
+        <Button disabled={syncBusy || Boolean(confirmationConflict)} variant="secondary" onClick={() => navigate(SCREEN.S03_T)}>
           수정하기 · 전체 표 보기
         </Button>
       ) : (

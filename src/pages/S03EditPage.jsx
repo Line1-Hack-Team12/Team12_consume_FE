@@ -23,9 +23,19 @@ function lastDay(month) {
 // S03-E 내역 수정하기
 export default function S03EditPage({ params }) {
   const { back } = useAppNavigation()
-  const { draft, settings, updateTransaction, syncBusy, syncError } = useAnalysisSession()
+  const { draft, settings, updateTransaction, syncBusy, syncError, confirmationBackups } = useAnalysisSession()
   const original = draft?.transactions.find((t) => t.id === params?.id)
-  const [form, setForm] = useState(() => (original ? { ...original, amountText: formatNumber(original.amountKrw) } : null))
+  const [form, setForm] = useState(() => {
+    if (!original) return null
+    const backupIndex = params?.restoreDraft == null ? -1 : Number(params.restoreDraft)
+    const saved = Number.isInteger(backupIndex) ? confirmationBackups[backupIndex]?.transactions.find((row) => row.id === original.id) : null
+    const restored = { ...original }
+    if (saved) {
+      const fields = ['date', 'time', 'merchant', 'amountKrw', 'slotMonth', ...(USE_MOCK ? ['direction', 'kind', 'category', 'subcategory'] : [])]
+      for (const key of fields) restored[key] = saved[key]
+    }
+    return { ...restored, amountText: formatNumber(restored.amountKrw) }
+  })
   const [showErrors, setShowErrors] = useState(false)
   const allowLeaveRef = useRef(false)
   const hasChanges = Boolean(original && form && (

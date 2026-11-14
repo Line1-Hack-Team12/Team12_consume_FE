@@ -114,6 +114,7 @@ export function generateMockDraft(slots) {
 }
 
 export const REVIEW_REASON_LABEL = {
+  server_changed: '다른 곳에서 변경된 내역이에요',
   low_confidence: '금액이 흐릿해요',
   date_missing: '날짜가 비어 있어요',
   merchant_missing: '가맹점명이 비어 있어요',

@@ -6,6 +6,8 @@ import { DEFAULT_MONTH_COUNT, DEFAULT_TONE } from '../../constants/limits'
 import { buildSlots } from '../../utils/months'
 import { regenerateNarratives, savePatternResponse } from '../../api/analysis'
 import { saveTransactionEdit } from '../../api/transactionEdits'
+import { confirmReviewedDraft, fetchReviewDraft, ReviewConflictError } from '../../api/reviewConfirmation'
+import { recoverReviewDraft } from '../../utils/draftConflict'
 import { AnalysisSessionContext } from '../../hooks/analysisSessionContext'
 import { createPatternResponseStore } from '../../mocks/patternResponses'
 import { createSavingsPlanStore } from '../../mocks/plans'
@@ -22,6 +24,8 @@ const initialState = {
   sessionId: null, // 백엔드 세션 ID (API 모드)
   syncError: null, // 서버 반영 실패 문구
   narrativeError: '',
+  confirmationConflict: null,
+  confirmationBackups: [],
 }
 
 function reducer(state, action) {
@@ -49,7 +53,15 @@ function reducer(state, action) {
     case 'consent':
       return { ...state, consent: action.value }
     case 'draft':
-      return { ...state, draft: action.draft, confirmed: false, snapshot: null, analysis: null }
+      return { ...state, draft: action.draft, confirmed: false, snapshot: null, analysis: null, confirmationConflict: null, confirmationBackups: [] }
+    case 'confirmationConflict':
+      return { ...state, confirmed: false, snapshot: null, analysis: null,
+        confirmationConflict: { refreshError: action.error.refreshError },
+        confirmationBackups: [...state.confirmationBackups, state.draft] }
+    case 'confirmationRefreshError':
+      return { ...state, confirmationConflict: { ...state.confirmationConflict, refreshError: action.message } }
+    case 'recoverConfirmation':
+      return { ...state, draft: action.draft, confirmed: false, snapshot: null, analysis: null, confirmationConflict: null, syncError: null }
     case 'updateTransaction': {
       if (!state.draft) return state
       const transactions = state.draft.transactions.map((t) => (t.id === action.id ? { ...t, ...action.patch } : t))
@@ -140,7 +152,7 @@ export default function AnalysisSessionProvider({ children }) {
   const updateTransaction = useCallback(
     async (id, patch) => {
       const before = stateRef.current.draft?.transactions.find((t) => t.id === id)
-      if (!before || savingRef.current) return false
+      if (!before || savingRef.current || stateRef.current.confirmationConflict) return false
       if (USE_MOCK) { dispatch({ type: 'updateTransaction', id, patch }); return true }
       if (!before.serverId) return false
       savingRef.current = true
@@ -152,7 +164,7 @@ export default function AnalysisSessionProvider({ children }) {
       try {
           const result = await saveTransactionEdit(before, next, action)
           const rows = stateRef.current.draft.transactions.map((t) => t.id === id ? next : t)
-          const queue = rows.filter((t) => t.reviewReasons.length > 0)
+          const queue = rows.filter((t) => t.reviewReasons.some((reason) => reason !== 'server_changed'))
           if (queue.length > 0 && queue.every((t) => t.reviewStatus !== 'pending') && before.reviewStatus === 'pending') {
             await sessionApi.confirmReviewQueue(sessionId, queue.map((t) => ({ transactionId: t.serverId, applySuggested: false })))
           }
@@ -168,7 +180,7 @@ export default function AnalysisSessionProvider({ children }) {
   const setDuplicateDecision = useCallback(
     async (id, decision) => {
       const group = stateRef.current.draft?.duplicateGroups.find((g) => g.id === id)
-      if (!group || savingRef.current) return false
+      if (!group || savingRef.current || stateRef.current.confirmationConflict) return false
       if (USE_MOCK) { dispatch({ type: 'duplicateDecision', id, decision }); return true }
       savingRef.current = true; setSyncBusy(true)
       try {
@@ -185,7 +197,7 @@ export default function AnalysisSessionProvider({ children }) {
   // S03 확인 체크 → POST /review/check
   const setConfirmed = useCallback(
     async (value) => {
-      if (savingRef.current) return
+      if (savingRef.current || stateRef.current.confirmationConflict) return
       if (USE_MOCK || !value) { dispatch({ type: 'confirmed', value }); return }
       savingRef.current = true; setSyncBusy(true)
       try {
@@ -212,6 +224,44 @@ export default function AnalysisSessionProvider({ children }) {
     return draft
   }, [])
 
+  const confirmReview = useCallback(async () => {
+    const current = stateRef.current
+    if (savingRef.current || current.syncError || current.confirmationConflict || !current.confirmed || !current.draft) {
+      throw new Error('검토·저장 상태를 먼저 확인해 주세요.')
+    }
+    savingRef.current = true; setSyncBusy(true)
+    try {
+      if (USE_MOCK) return null
+      const slots = buildSlots(current.settings.lastMonth, current.settings.monthCount)
+      const result = await confirmReviewedDraft(current.sessionId, current.draft, slots)
+      if (stateRef.current.sessionId !== current.sessionId || stateRef.current.draft !== current.draft) {
+        throw new Error('검토 중인 세션이 바뀌었어요. 현재 내역을 다시 확인해 주세요.')
+      }
+      return result
+    } catch (error) {
+      if (error instanceof ReviewConflictError && stateRef.current.sessionId === current.sessionId) {
+        dispatch({ type: 'confirmationConflict', error })
+      }
+      throw error
+    } finally { savingRef.current = false; setSyncBusy(false) }
+  }, [])
+
+  const reloadAfterConflict = useCallback(async () => {
+    const current = stateRef.current
+    if (savingRef.current || !current.confirmationConflict) return false
+    savingRef.current = true; setSyncBusy(true)
+    try {
+      const slots = buildSlots(current.settings.lastMonth, current.settings.monthCount)
+      const latest = await fetchReviewDraft(current.sessionId, slots)
+      if (stateRef.current.sessionId !== current.sessionId) return false
+      dispatch({ type: 'recoverConfirmation', draft: recoverReviewDraft(current.draft, latest) })
+      return true
+    } catch (error) {
+      if (stateRef.current.sessionId === current.sessionId) dispatch({ type: 'confirmationRefreshError', message: error.message })
+      return false
+    } finally { savingRef.current = false; setSyncBusy(false) }
+  }, [])
+
   const actions = useMemo(
     () => ({
       updateSettings: (patch) => dispatch({ type: 'settings', patch }),
@@ -232,13 +282,10 @@ export default function AnalysisSessionProvider({ children }) {
       setSessionId: (value) => dispatch({ type: 'sessionId', value }),
       clearSyncError: () => dispatch({ type: 'syncError', value: null }),
       loadDraftFromServer,
-      // S03-R → POST /confirm (목업 모드에서는 바로 통과)
-      confirmReview: () => {
-        if (savingRef.current || stateRef.current.syncError) return Promise.reject(new Error('저장 상태를 먼저 확인해 주세요.'))
-        return USE_MOCK ? Promise.resolve(null) : sessionApi.confirmSession(stateRef.current.sessionId)
-      },
+      confirmReview,
+      reloadAfterConflict,
     }),
-    [addFiles, removeFile, updateTransaction, setDuplicateDecision, setConfirmed, loadDraftFromServer, setTone],
+    [addFiles, removeFile, updateTransaction, setDuplicateDecision, setConfirmed, loadDraftFromServer, setTone, confirmReview, reloadAfterConflict],
   )
 
   const value = useMemo(() => ({ ...state, ...actions, syncBusy, toneBusy, patternResponseStore, savingsPlanStore, selectedPlan }), [state, actions, syncBusy, toneBusy, patternResponseStore, savingsPlanStore, selectedPlan])
