@@ -6,6 +6,7 @@ import Card from '../components/ui/Card'
 import Chip from '../components/ui/Chip'
 import Checkbox from '../components/ui/Checkbox'
 import Note from '../components/ui/Note'
+import PlanGoalSummary from '../components/ui/PlanGoalSummary'
 import { SCREEN } from '../constants/screens'
 import { useAnalysisSession } from '../hooks/analysisSessionContext'
 import { useAppNavigation } from '../hooks/navigationContext'
@@ -16,7 +17,7 @@ import ReminderSettings from './S06/ReminderSettings'
 
 // F14. 규칙 설정은 기존 카드 응답과 공유하고, 발송·스케줄은 연결하지 않는다.
 export default function S06ReminderPage({ params }) {
-  const { snapshot, analysis } = useAnalysisSession()
+  const { snapshot, analysis, serverPlanSelection } = useAnalysisSession()
   const { navigate } = useAppNavigation()
   const designPreview = import.meta.env.DEV && new URLSearchParams(window.location.search).get('demo') === 's05'
   const result = designPreview ? S05_PREVIEW_ANALYSIS : snapshot && analysis?.snapshotId === snapshot.id ? analysis : null
@@ -31,7 +32,8 @@ export default function S06ReminderPage({ params }) {
     )
   }
 
-  if (validResult.mode === 'server') return <ServerReminderManager key={snapshot.id} sessionId={snapshot.sessionId} snapshotId={snapshot.id} />
+  if (validResult.mode === 'server') return <ServerReminderManager key={snapshot.id} sessionId={snapshot.sessionId} snapshotId={snapshot.id}
+    planSelection={serverPlanSelection?.snapshotId === snapshot.id && serverPlanSelection.sessionId === snapshot.sessionId ? serverPlanSelection : null} />
 
   return <ReminderManager key={`${designPreview}:${validResult.snapshotId}`} result={validResult} designPreview={designPreview} />
 }
@@ -86,6 +88,8 @@ function ReminderManager({ result, designPreview }) {
         <Button disabled={leaving} onClick={() => leave(SCREEN.S10)}>완료</Button>
         <Button variant="secondary" disabled={leaving} onClick={() => leave(SCREEN.S05)}>결과 홈으로</Button>
       </>}>
+      {selectedPlan?.snapshotId === result.snapshotId ? <PlanGoalSummary goalKrw={selectedPlan.goalKrw} plan={selectedPlan.plan} /> : null}
+
       {rules.length > 1 ? (
         <section className="flex flex-col gap-2.5" aria-label="알림 규칙 선택">
           <h2 className="text-body-b">관리할 알림</h2>

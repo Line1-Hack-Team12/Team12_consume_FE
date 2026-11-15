@@ -6,6 +6,7 @@ import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import Chip from '../components/ui/Chip'
 import Note from '../components/ui/Note'
+import PlanGoalSummary from '../components/ui/PlanGoalSummary'
 import { SCREEN } from '../constants/screens'
 import { MIN_PLAN_GOAL_KRW } from '../constants/plans'
 import { useAnalysisSession } from '../hooks/analysisSessionContext'
@@ -16,7 +17,7 @@ import { formatKRW } from '../utils/format'
 import GoalCard from './S09/GoalCard'
 import SavingsPlanCard from './S09/SavingsPlanCard'
 
-// S09 저축 플랜 (F17). 절감액·가능 최대치·조합은 목업 응답을 그대로 표시한다.
+// S09 저축 플랜 (F17). 목표와 예상 절감액을 구분하고, 목표 미달 플랜도 선택할 수 있다.
 export default function S09SavingsPlanPage({ params }) {
   const mounted = useRef(false)
   const { navigate } = useAppNavigation()
@@ -46,7 +47,9 @@ export default function S09SavingsPlanPage({ params }) {
   const selected = savings.plans.find((plan) => plan.id === savings.selectedPlanId)
   const disabled = savings.loading || savings.choosing
   const showExample = designPreview || validResult.mode === 'demo'
-  const selectionLabel = selected ? `${selected.label} 선택${savings.eligibleReminderCount > 0 ? ' · demo 알림 켜기' : ''}` : '선택할 수 있는 플랜이 없어요'
+  const selectionLabel = selected ? `월 ${formatKRW(selected.monthlySavingsKrw)} ${selected.label} 선택` : savings.plans.length > 0 ? '플랜을 선택해 주세요' : '선택할 수 있는 플랜이 없어요'
+  const canAdjustGoal = selected && selected.monthlySavingsKrw < savings.goalKrw
+    && selected.monthlySavingsKrw >= MIN_PLAN_GOAL_KRW && selected.monthlySavingsKrw <= savings.sliderMaxKrw
 
   const confirm = async () => {
     if (await savings.confirmSelection() && mounted.current) navigate(SCREEN.S06, { snapshotId: validResult.snapshotId })
@@ -59,7 +62,7 @@ export default function S09SavingsPlanPage({ params }) {
       backIcon={<img src={back} width={24} height={24} alt="" className="block" />}
       footer={
         <>
-          <Button disabled={disabled || Boolean(savings.error) || !selected?.goalMet} onClick={confirm}>
+          <Button disabled={disabled || Boolean(savings.error) || !selected} onClick={confirm}>
             {savings.choosing ? '플랜을 선택하고 있어요…' : selectionLabel}
           </Button>
           {showExample ? <Button variant="secondary" disabled={savings.impossibleExampleDisabled} title={savings.impossibleExampleReason || undefined} onClick={savings.showImpossibleExample}>달성 불가 예시</Button> : null}
@@ -67,7 +70,7 @@ export default function S09SavingsPlanPage({ params }) {
         </>
       }
     >
-      <GoalCard value={savings.goalKrw} max={savings.sliderMaxKrw} disabled={savings.choosing || Number.isFinite(savings.maxPossibleKrw) && savings.maxPossibleKrw < MIN_PLAN_GOAL_KRW} onChange={savings.setGoal} />
+      <GoalCard value={savings.goalKrw} max={savings.sliderMaxKrw} disabled={savings.choosing} onChange={savings.setGoal} />
 
       <section className="flex flex-col gap-2.5" aria-labelledby="plan-locks-title">
         <h2 id="plan-locks-title" className="text-body-b">줄이기 어려운 항목</h2>
@@ -84,13 +87,6 @@ export default function S09SavingsPlanPage({ params }) {
         )}
       </section>
 
-      {savings.goalClamped ? (
-        <Note tone="warn" icon="alert">
-          <p className="text-caption-m">현재 소비 구조에서는 최대 {formatKRW(savings.maxPossibleKrw)}까지 가능해요.</p>
-          <p>요청한 월 {formatKRW(savings.requestedGoalKrw)}에 맞추기 어려워 목표와 슬라이더 상한을 조정했어요.</p>
-        </Note>
-      ) : null}
-
       {savings.error ? (
         <Note tone="warn" icon="alert">
           <p>{savings.error}</p>
@@ -99,7 +95,7 @@ export default function S09SavingsPlanPage({ params }) {
       ) : savings.plans.length > 0 ? (
         <ul className="flex flex-col gap-5" role="radiogroup" aria-label="저축 플랜" aria-busy={savings.loading}>
           {savings.plans.map((plan) => (
-            <SavingsPlanCard key={plan.id} plan={plan} selected={plan.id === savings.selectedPlanId} disabled={disabled} onSelect={savings.selectPlan} />
+            <SavingsPlanCard key={plan.id} plan={plan} goalKrw={savings.goalKrw} selected={plan.id === savings.selectedPlanId} disabled={disabled} onSelect={savings.selectPlan} />
           ))}
         </ul>
       ) : savings.loading ? (
@@ -110,6 +106,14 @@ export default function S09SavingsPlanPage({ params }) {
           <p className="text-caption text-ink-2">{savings.unavailableReason || '잠금을 풀거나 다른 달의 기록을 더해 다시 확인해 보세요.'}</p>
         </Card>
       )}
+
+      {selected && !savings.error ? (
+        <PlanGoalSummary goalKrw={savings.goalKrw} plan={selected}>
+          {canAdjustGoal ? <Button variant="tonal" size="sm" disabled={disabled} onClick={() => savings.setGoal(selected.monthlySavingsKrw)}>
+            목표를 {formatKRW(selected.monthlySavingsKrw)}으로 맞추기
+          </Button> : null}
+        </PlanGoalSummary>
+      ) : null}
 
       {savings.choiceError ? (
         <Note tone="warn" icon="alert">{savings.choiceError} 선택 버튼을 눌러 다시 시도할 수 있어요.</Note>

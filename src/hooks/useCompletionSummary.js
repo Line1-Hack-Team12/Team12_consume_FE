@@ -7,7 +7,7 @@ import { createCompletionSnapshotReader, summarizeCompletion } from '../utils/co
 import { useAnalysisSession } from './analysisSessionContext'
 
 export default function useCompletionSummary({ result, designPreview = false }) {
-  const { snapshot, analysis, patternResponseStore, savingsPlanStore } = useAnalysisSession()
+  const { snapshot, analysis, patternResponseStore, savingsPlanStore, serverPlanSelection } = useAnalysisSession()
   const summaryQuery = useQuery({
     ...completionSummaryQuery(snapshot?.sessionId, result?.snapshotId),
     enabled: result?.mode === 'server' && snapshot?.sessionId != null && snapshot?.id === result?.snapshotId,
@@ -48,7 +48,9 @@ export default function useCompletionSummary({ result, designPreview = false }) 
     enabledReminderCount: serverSummary?.activeDemoRuleCount,
     planReminderCount: 0,
     selectedPlanText: serverSummary?.selectedPlanSummary,
-    selectedPlan: null, hasUnsavedResponses: local.hasUnsavedResponses, unsavedPatternIds: local.unsavedPatternIds,
+    selectedPlan: serverPlanSelection?.snapshotId === result.snapshotId && serverPlanSelection.sessionId === snapshot?.sessionId ? serverPlanSelection.plan : null,
+    selectedPlanGoalKrw: serverPlanSelection?.snapshotId === result.snapshotId && serverPlanSelection.sessionId === snapshot?.sessionId ? serverPlanSelection.goalKrw : null,
+    hasUnsavedResponses: local.hasUnsavedResponses, unsavedPatternIds: local.unsavedPatternIds,
     loading: summaryQuery.isPending && !serverError, error: serverError, retry: summaryQuery.refetch,
   }
   return local

@@ -34,7 +34,6 @@ export default function useSavingsPlan({ result, designPreview = false }) {
     requestedGoalKrw: entry.requestedGoalKrw,
     sliderMaxKrw: entry.sliderMaxKrw,
     maxPossibleKrw,
-    goalClamped: response?.goalClamped ?? false,
     locks: (model?.locks ?? []).map((lock) => ({ ...lock, locked: entry.lockedIds.includes(lock.id) })),
     plans,
     selectedPlanId: entry.selectedPlanId,

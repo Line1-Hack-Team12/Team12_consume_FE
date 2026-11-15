@@ -50,6 +50,7 @@ export function summarizeCompletion({ patterns, entries, scope, snapshotId, plan
     enabledReminderCount,
     planReminderCount,
     selectedPlan,
+    selectedPlanGoalKrw: selectedPlan && Number.isFinite(planSelection?.goalKrw) ? planSelection.goalKrw : null,
     hasUnsavedResponses: unsavedPatternIds.length > 0,
     unsavedPatternIds,
   }

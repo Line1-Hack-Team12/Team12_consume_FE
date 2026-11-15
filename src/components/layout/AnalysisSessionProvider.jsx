@@ -22,6 +22,7 @@ const initialState = {
   confirmed: false,
   snapshot: null,
   analysis: null,
+  serverPlanSelection: null,
   sessionId: null, // 백엔드 세션 ID (API 모드)
   syncError: null, // 서버 반영 실패 문구
   narrativeError: '',
@@ -85,7 +86,10 @@ function reducer(state, action) {
     case 'confirmed':
       return { ...state, confirmed: action.value }
     case 'snapshot':
-      return { ...state, snapshot: action.snapshot, analysis: null }
+      return { ...state, snapshot: action.snapshot, analysis: null, serverPlanSelection: null }
+    case 'serverPlanSelection':
+      if (action.selection.snapshotId !== state.snapshot?.id || action.selection.sessionId !== state.snapshot?.sessionId) return state
+      return { ...state, serverPlanSelection: action.selection }
     case 'analysis':
       if (action.analysis?.snapshotId !== state.snapshot?.id) return state
       return { ...state, analysis: action.analysis, narrativeError: '' }
@@ -290,6 +294,7 @@ export default function AnalysisSessionProvider({ children }) {
       setConfirmed,
       setSnapshot: (snapshot) => dispatch({ type: 'snapshot', snapshot }),
       setAnalysis: (analysis) => dispatch({ type: 'analysis', analysis }),
+      setServerPlanSelection: (selection) => dispatch({ type: 'serverPlanSelection', selection }),
       setSessionId: (value) => dispatch({ type: 'sessionId', value }),
       clearSyncError: () => dispatch({ type: 'syncError', value: null }),
       loadDraftFromServer,

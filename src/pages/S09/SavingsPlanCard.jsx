@@ -3,10 +3,11 @@ import Badge from '../../components/ui/Badge'
 import Card from '../../components/ui/Card'
 import { formatKRW } from '../../utils/format'
 
-export default function SavingsPlanCard({ plan, selected, disabled, onSelect }) {
+export default function SavingsPlanCard({ plan, goalKrw, selected, disabled, onSelect }) {
   const inputId = useId()
   const titleId = `${inputId}-title`
   const totalId = `${inputId}-total`
+  const shortfall = Math.max(0, goalKrw - plan.monthlySavingsKrw)
 
   return (
     <Card as="li" className={`relative border ${selected ? 'border-brand inset-ring inset-ring-brand' : 'border-line'}`}>
@@ -26,8 +27,9 @@ export default function SavingsPlanCard({ plan, selected, disabled, onSelect }) 
             className="size-[22px] shrink-0 appearance-none rounded-full border-[1.5px] border-line-strong bg-surface checked:border-[6px] checked:border-brand focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand"
           />
           <h2 id={titleId} className="min-w-0 flex-1 text-body-b">{plan.label} · {plan.title}</h2>
-          <Badge tone={plan.goalMet ? 'success' : 'normal'}>{plan.goalMet ? '목표 달성' : '목표 미달'}</Badge>
+          <Badge tone={shortfall > 0 ? 'normal' : 'success'}>{shortfall > 0 ? '목표보다 적음' : '목표 이상'}</Badge>
         </div>
+        {shortfall > 0 ? <p className="text-caption text-ink-2">목표까지 월 {formatKRW(shortfall)} 부족</p> : null}
         <ul className="flex flex-col gap-3">
           {plan.items.map((item) => (
             <li key={item.id} className="flex items-center gap-2">
@@ -43,7 +45,7 @@ export default function SavingsPlanCard({ plan, selected, disabled, onSelect }) 
         </ul>
         <div className="h-px bg-line" />
         <p id={totalId} className="flex items-center justify-between gap-2 text-body text-ink-2">
-          <span>월 합계</span>
+          <span>예상 월 절감액</span>
           <span className="shrink-0 text-body-b text-brand">월 {formatKRW(plan.monthlySavingsKrw)}</span>
         </p>
       </div>

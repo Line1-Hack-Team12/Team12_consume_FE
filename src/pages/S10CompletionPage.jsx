@@ -5,6 +5,7 @@ import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import IconBox from '../components/ui/IconBox'
 import Note from '../components/ui/Note'
+import PlanGoalSummary from '../components/ui/PlanGoalSummary'
 import { SCREEN } from '../constants/screens'
 import { useAnalysisSession } from '../hooks/analysisSessionContext'
 import { useAppNavigation } from '../hooks/navigationContext'
@@ -63,6 +64,7 @@ export default function S10CompletionPage({ params }) {
           <SummaryRow label="선택 플랜">{summary.loading || summary.error ? '확인 중' : summary.selectedPlanText ?? (plan ? `${planLabel} · 월 ${formatKRW(plan.monthlySavingsKrw)} 제안` : '선택하지 않음')}</SummaryRow>
         </dl>
       </Card>
+      <PlanGoalSummary goalKrw={summary.selectedPlanGoalKrw} plan={plan} />
       {summary.error ? <Note tone="warn"><p>{summary.error}</p><Button size="sm" onClick={summary.retry}>요약 다시 불러오기</Button></Note> : null}
 
       {summary.hasUnsavedResponses ? (

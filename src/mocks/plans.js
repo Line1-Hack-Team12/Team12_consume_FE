@@ -122,8 +122,7 @@ function eligiblePatterns(model, items, responseStore) {
 export function buildMockPlans({ model, requestedGoalKrw, lockedIds, responseStore, empty = false }) {
   const available = empty ? [] : model.candidates.filter((item) => !lockedIds.includes(item.lockId))
   const maxPossibleKrw = available.reduce((sum, item) => sum + item.monthlySavingsKrw, 0)
-  const goalClamped = requestedGoalKrw > maxPossibleKrw
-  const goalKrw = Math.max(MIN_PLAN_GOAL_KRW, Math.min(requestedGoalKrw, maxPossibleKrw))
+  const goalKrw = Math.max(MIN_PLAN_GOAL_KRW, Math.min(requestedGoalKrw, MAX_PLAN_GOAL_KRW))
   const unavailableReason = maxPossibleKrw < MIN_PLAN_GOAL_KRW ? '현재 기록과 잠금 조건으로는 월 1만 원 이상의 플랜을 만들 수 없어요. 잠금을 풀거나 기록을 더해 주세요.' : ''
   const recurring = available.filter((item) => item.kind === 'recurring')
   const focusItems = available.filter((item) => item.kind !== 'recurring')
@@ -163,12 +162,12 @@ export function buildMockPlans({ model, requestedGoalKrw, lockedIds, responseSto
         : '감축 항목은 한 번씩만 계산했어요. 요일·시각 근거가 없는 항목에는 알림을 만들지 않고, 구독 해지는 행동 체크만 남겨요.',
     })
   }
-  return { mode: 'demo', snapshotId: model.snapshotId, goalKrw, requestedGoalKrw, maxPossibleKrw, goalClamped, plans, unavailableReason, basisLabel: model.basisLabel }
+  return { mode: 'demo', snapshotId: model.snapshotId, goalKrw, requestedGoalKrw, maxPossibleKrw, plans, unavailableReason, basisLabel: model.basisLabel }
 }
 
 function planError(message) { return new Error(message) }
 function initialEntry(model) {
-  return { goalKrw: DEFAULT_PLAN_GOAL_KRW, requestedGoalKrw: DEFAULT_PLAN_GOAL_KRW, sliderMaxKrw: MAX_PLAN_GOAL_KRW, hasClamped: false, lockedIds: [...model.defaultLockedIds], response: null, selectedPlanId: null, selectedPlan: null, loading: false, error: '', choosing: false, choiceError: '', requestId: 0 }
+  return { goalKrw: DEFAULT_PLAN_GOAL_KRW, requestedGoalKrw: DEFAULT_PLAN_GOAL_KRW, sliderMaxKrw: MAX_PLAN_GOAL_KRW, lockedIds: [...model.defaultLockedIds], response: null, selectedPlanId: null, selectedPlan: null, loading: false, error: '', choosing: false, choiceError: '', requestId: 0 }
 }
 
 // 실제 플랜·알림 API 계약 대신 Provider 안에서만 사용하는 합성 응답 저장소다.
@@ -217,7 +216,7 @@ export function createSavingsPlanStore({ responseStore }) {
       const response = buildMockPlans({ model, requestedGoalKrw: current.requestedGoalKrw, lockedIds: current.lockedIds, responseStore, empty: scenario === 'empty' })
       const latest = entries.get(key)
       const selectedPlanId = response.plans.some((plan) => plan.id === latest.selectedPlanId) ? latest.selectedPlanId : response.plans[0]?.id ?? null
-      replace(key, { ...latest, response, goalKrw: response.goalKrw, hasClamped: latest.hasClamped || response.goalClamped, sliderMaxKrw: latest.hasClamped || response.goalClamped ? Math.max(MIN_PLAN_GOAL_KRW, Math.min(MAX_PLAN_GOAL_KRW, response.maxPossibleKrw)) : MAX_PLAN_GOAL_KRW, selectedPlanId, loading: false, error: '' })
+      replace(key, { ...latest, response, goalKrw: response.goalKrw, selectedPlanId, loading: false, error: '' })
       return true
     },
     setGoal(key, value, options) {
@@ -246,7 +245,7 @@ export function createSavingsPlanStore({ responseStore }) {
       const entry = entries.get(key)
       const model = models.get(key)
       const plan = entry?.response?.plans.find((item) => item.id === entry.selectedPlanId)
-      if (!entry || !model || !plan || entry.loading || !active(key) || !plan.goalMet) return Promise.resolve(false)
+      if (!entry || !model || !plan || entry.loading || entry.error || !active(key)) return Promise.resolve(false)
       const signature = `${plan.id}:${entry.goalKrw}:${[...entry.lockedIds].sort().join(',')}:${plan.items.map((item) => item.id).sort().join(',')}`
       if (entry.selectedPlan?.signature === signature) return Promise.resolve(true)
       replace(key, { ...entry, choosing: true, choiceError: '' })

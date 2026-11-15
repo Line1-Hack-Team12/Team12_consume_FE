@@ -6,6 +6,7 @@ import ScreenLayout from '../../components/layout/ScreenLayout'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import Note from '../../components/ui/Note'
+import PlanGoalSummary from '../../components/ui/PlanGoalSummary'
 import Toggle from '../../components/ui/Toggle'
 import { SelectField } from '../../components/ui/Field'
 import { REMINDER_TIME_OPTIONS, validateReminderTime } from '../../constants/reminders'
@@ -14,7 +15,7 @@ import { SCREEN } from '../../constants/screens'
 import { useAppNavigation } from '../../hooks/navigationContext'
 import DemoReminderDialog from './DemoReminderDialog'
 
-export default function ServerReminderManager({ sessionId, snapshotId }) {
+export default function ServerReminderManager({ sessionId, snapshotId, planSelection }) {
   const { navigate } = useAppNavigation()
   const client = useQueryClient()
   const options = notificationsQuery(sessionId, snapshotId)
@@ -52,6 +53,7 @@ export default function ServerReminderManager({ sessionId, snapshotId }) {
     <Button disabled={busy || loading} onClick={() => navigate(SCREEN.S10)}>완료</Button>
     <Button variant="secondary" disabled={busy} onClick={() => navigate(SCREEN.S05)}>결과 홈으로</Button>
   </>}>
+    {planSelection ? <PlanGoalSummary goalKrw={planSelection.goalKrw} plan={planSelection.plan} /> : null}
     {loading ? <Note>알림 규칙을 불러오고 있어요.</Note> : !rules.length ? <Note>아직 설정된 알림이 없어요. 요일·시각 근거가 있는 습관을 확인해 주세요.</Note> : null}
     {error ? <Note tone="warn"><p role="alert">{error}</p><Button size="sm" variant="secondary" disabled={busy || query.isFetching} onClick={() => { setError(''); query.refetch() }}>다시 확인</Button></Note> : null}
     {rules.map((rule) => <Card key={rule.notificationId} className="flex flex-col gap-3">
