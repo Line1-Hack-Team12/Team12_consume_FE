@@ -45,7 +45,10 @@ export function formatMonth(month) {
 }
 
 export function formatShortMonth(month) {
-  return `${Number(month.split('-')[1])}월`
+  // 업로드 슬롯은 'YYYY-MM', 서버 리포트의 월 이름은 '8월' 형식이다.
+  const match = /^(?:\d{4}-(\d{2})|(\d{1,2})월?)$/.exec(typeof month === 'string' ? month.trim() : '')
+  const number = match ? Number(match[1] ?? match[2]) : 0
+  return number >= 1 && number <= 12 ? `${number}월` : '월 정보 없음'
 }
 
 /** 슬롯 범위 문구: '8~10월' / '2025년 12월~2026년 1월' */
