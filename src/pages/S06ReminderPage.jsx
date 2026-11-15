@@ -117,7 +117,7 @@ function ReminderManager({ result, designPreview }) {
         </Card>
       )}
 
-      <p className="text-micro text-ink-3">{designPreview ? '디자인 미리보기 · 합성 예시 데이터예요.' : '데모 설정 · 현재 확정한 기록에 연결돼요.'} 실제 푸시와 예약 발송은 아직 연결되지 않았어요. 설정은 현재 세션에서 유지돼요.</p>
+      <p className="text-micro text-ink-3">{designPreview ? '디자인 미리보기 · 합성 예시 데이터예요.' : '데모 설정 · 현재 확정한 기록에 연결돼요.'} 브라우저 알림은 지금 보내보기를 눌렀을 때만 표시해요. 설정은 현재 세션에서 유지돼요.</p>
     </ScreenLayout>
   )
 }

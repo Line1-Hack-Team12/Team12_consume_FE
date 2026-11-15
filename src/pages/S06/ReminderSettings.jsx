@@ -10,6 +10,7 @@ import { REMINDER_TIME_OPTIONS, isValidReminderTime, validateReminderTime } from
 import { SCREEN } from '../../constants/screens'
 import { useAppNavigation } from '../../hooks/navigationContext'
 import usePatternResponse from '../../hooks/usePatternResponse'
+import useDemoNotification from '../../hooks/useDemoNotification'
 import { buildS06ReminderPreview } from '../../mocks/reminders'
 import DemoReminderDialog from './DemoReminderDialog'
 
@@ -22,7 +23,9 @@ function Condition({ label, children }) {
 export default function ReminderSettings({ pattern, snapshotId, designPreview, tone, disabled }) {
   const { navigate } = useAppNavigation()
   const { response, saving, error, customError, setReminderEnabled, setReminderTime, retry } = usePatternResponse({ pattern, snapshotId, designPreview })
-  const [demoOpen, setDemoOpen] = useState(false)
+  const demo = useDemoNotification()
+  const busy = disabled || demo.sending
+  const [demoError, setDemoError] = useState('')
   const [timeError, setTimeError] = useState('')
   const timeId = useId()
   const suggestion = pattern.reminderSuggestion
@@ -39,11 +42,11 @@ export default function ReminderSettings({ pattern, snapshotId, designPreview, t
   const expectedLabel = expectedTime?.endsWith(':00') ? `${Number(expectedTime.slice(0, 2))}시` : expectedTime
   const timeAdjusted = reminder.time !== suggestion.time
   const stateLabel = notApplicable ? '해당 없음 · 일시정지' : enabled ? '켜짐 · 바로 해제 가능' : reminder.state === 'paused' ? '일시정지됨' : '꺼짐 · 다시 켤 수 있어요'
-  const canPreview = enabled && !notApplicable && timeValid && !error && !customError && !saving && !disabled
+  const canPreview = enabled && !notApplicable && timeValid && !error && !customError && !saving && !busy
 
   const turnOff = () => {
     setReminderEnabled(false)
-    setDemoOpen(false)
+    demo.dismissPreview()
   }
 
   return <>
@@ -66,7 +69,7 @@ export default function ReminderSettings({ pattern, snapshotId, designPreview, t
     <Card className="flex flex-col gap-3">
       <label htmlFor={timeId} className="text-body-b">알림 시각</label>
       <div className="relative">
-        <select id={timeId} value={reminder.time ?? ''} disabled={disabled || notApplicable} aria-invalid={Boolean(timeError)} aria-describedby={timeError ? `${timeId}-error` : undefined}
+        <select id={timeId} value={reminder.time ?? ''} disabled={busy || notApplicable} aria-invalid={Boolean(timeError)} aria-describedby={timeError ? `${timeId}-error` : undefined}
           className="w-full appearance-none rounded-xl bg-canvas py-[13px] pr-11 pl-3.5 text-body-b outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:text-ink-3"
           onChange={(event) => {
             const time = event.target.value
@@ -80,7 +83,7 @@ export default function ReminderSettings({ pattern, snapshotId, designPreview, t
       {timeError ? <p id={`${timeId}-error`} role="alert" className="text-caption text-danger-ink">{timeError}</p> : null}
       <div className="flex items-center gap-2">
         <p className="min-w-0 flex-1 text-body-m text-ink-2" role="status">{stateLabel}</p>
-        <Toggle checked={enabled} label={`${pattern.title} 사전 알림`} disabled={disabled || notApplicable || (!enabled && !timeValid)}
+        <Toggle checked={enabled} label={`${pattern.title} 사전 알림`} disabled={busy || notApplicable || (!enabled && !timeValid)}
           onChange={(on) => on ? setReminderEnabled(true) : turnOff()} />
       </div>
       {notApplicable ? <p className="text-caption text-ink-2">해당 없음으로 답한 습관은 알림을 켤 수 없어요. 카드 상세에서 응답을 바꿀 수 있어요.</p> : null}
@@ -93,8 +96,8 @@ export default function ReminderSettings({ pattern, snapshotId, designPreview, t
     </Card>
 
     <Note tone="warn" iconContent={<img src={bell} width={16} height={16} alt="" className="shrink-0" />}>
-      <p>방해금지 22:00–08:00 · 주 최대 3회</p>
-      <p>실제 푸시는 권한 · 구독 · 동의 · 최신 기록 연결 후 가능해요.</p>
+      <p>지금 보내보기는 현재 시각에 브라우저 데모 알림을 표시해요.</p>
+      <p>정해진 시각의 자동 발송은 지원하지 않아요.</p>
     </Note>
 
     {error ? <Note tone="warn" icon="alert"><p role="alert">{error}</p><Button size="sm" variant="secondary" className="mt-2" disabled={saving || disabled} onClick={retry}>다시 저장</Button></Note> : null}
@@ -102,10 +105,17 @@ export default function ReminderSettings({ pattern, snapshotId, designPreview, t
     {customError ? <p className="text-caption text-danger-ink">{customError} 카드 상세에서 입력을 마치면 설정을 저장할 수 있어요.</p> : null}
 
     <div className="flex flex-col gap-2">
-      <Button variant="tonal" disabled={!canPreview} onClick={() => setDemoOpen(true)}>지금 보내보기 · 인앱 데모</Button>
-      <Button variant="secondary" disabled={disabled || !enabled} onClick={turnOff}>이 규칙 해제</Button>
-      {!enabled ? <p className="text-caption text-ink-2">{notApplicable ? '해당 없음으로 답한 규칙은 데모를 보낼 수 없어요.' : '알림을 켜면 인앱 데모를 확인할 수 있어요.'}</p> : null}
+      <Button variant="tonal" disabled={!canPreview} onClick={async () => {
+        setDemoError('')
+        try { await demo.send(() => ({ title: `${weekday} ${reminder.time}`, body: preview.message, disclaimer: preview.disclaimer })) }
+        catch { setDemoError('데모 알림을 준비하지 못했어요. 다시 눌러 주세요.') }
+      }}>{demo.sending ? '데모 알림을 준비하고 있어요…' : '지금 보내보기 · 브라우저 알림'}</Button>
+      <Button variant="secondary" disabled={busy || !enabled} onClick={turnOff}>이 규칙 해제</Button>
+      {!enabled ? <p className="text-caption text-ink-2">{notApplicable ? '해당 없음으로 답한 규칙은 데모를 보낼 수 없어요.' : '알림을 켜면 브라우저 데모 알림을 확인할 수 있어요.'}</p> : null}
     </div>
-    <DemoReminderDialog open={demoOpen && canPreview} preview={preview} title={`${weekday} ${reminder.time}`} onClose={() => setDemoOpen(false)} />
+    {demoError ? <Note tone="warn"><p role="alert">{demoError}</p></Note> : null}
+    {demo.feedback ? <Note tone={demo.feedback.tone}><p role="status">{demo.feedback.message}</p></Note> : null}
+    <DemoReminderDialog open={Boolean(demo.demoPreview) && enabled && !notApplicable} reason={demo.demoPreview?.reason}
+      preview={{ message: demo.demoPreview?.body, disclaimer: demo.demoPreview?.disclaimer }} title={demo.demoPreview?.title} onClose={demo.dismissPreview} />
   </>
 }
