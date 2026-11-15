@@ -21,7 +21,7 @@ import SlotCard from './S01/SlotCard'
 const TONE_EXAMPLE = {
   coach: '어떤 상황에서 배달을 시키셨나요?',
   friend: '그날 배달 시킨 이유, 뭐였어?',
-  grandma: '배달은 무슨 일로 그렇게 시켰누?',
+  grandma: '배달은 또 무슨 일로 시킨 거냐?',
 }
 
 function Section({ title, description, children }) {
