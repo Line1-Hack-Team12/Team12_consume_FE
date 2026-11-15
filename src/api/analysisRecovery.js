@@ -72,10 +72,10 @@ export function applyAnalysisNarratives(result, response, tone) {
     || !hasText(response.overallComment) || [...ids].some((id) => !completeCopy(copies.get(id)))
   const update = (pattern) => {
     const copy = copies.get(pattern.id)
-    if (!completeCopy(copy)) return pattern
-    return { ...pattern, copyByTone: { ...pattern.copyByTone, [tone]: {
-      observation: copy.observation, hypothesisQuestion: copy.hypothesisQuestion, action: copy.action,
-    } } }
+    const fields = Object.fromEntries(['title', 'observation', 'hypothesisQuestion', 'action']
+      .filter((key) => hasText(copy?.[key])).map((key) => [key, copy[key]]))
+    if (!Object.keys(fields).length) return pattern
+    return { ...pattern, copyByTone: { ...pattern.copyByTone, [tone]: { ...pattern.copyByTone?.[tone], ...fields } } }
   }
   return { ...result,
     summaryByTone: hasText(response.overallComment) ? { ...result.summaryByTone, [tone]: response.overallComment } : result.summaryByTone,

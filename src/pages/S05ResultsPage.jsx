@@ -15,6 +15,7 @@ import { useAppNavigation } from '../hooks/navigationContext'
 import { S05_PREVIEW_ANALYSIS } from '../mocks/s05Preview'
 import { formatKRW } from '../utils/format'
 import { formatShortMonth } from '../utils/months'
+import { getPatternCopy } from '../utils/patternCopy'
 import MarqueeText from './S05/MarqueeText'
 import PatternCard from './S05/PatternCard'
 
@@ -90,6 +91,7 @@ export default function S05ResultsPage() {
           </Chip>
         ))}
       </div>
+      {toneBusy ? <p className="text-caption text-ink-2" role="status">선택한 말투로 설명을 불러오고 있어요…</p> : null}
       {narrativeError || result.recovery?.narrativesIncomplete ? <Note tone="warn">
         <p role="alert">{narrativeError || '설명을 모두 불러오지 못했어요. 지출 금액과 카드 근거는 유지돼요.'}</p>
         <p className="mt-1">설명을 다시 만들어도 숫자와 근거는 바뀌지 않아요.</p>
@@ -108,7 +110,7 @@ export default function S05ResultsPage() {
         {result.patterns.length > 0 ? (
           <ul className="flex flex-col gap-5">
             {result.patterns.map((pattern, index) => (
-              <PatternCard key={pattern.id} pattern={pattern} featured={index === 0} onOpen={() => openPattern(pattern)} />
+              <PatternCard key={pattern.id} pattern={pattern} tone={tone} featured={index === 0} onOpen={() => openPattern(pattern)} />
             ))}
           </ul>
         ) : (
@@ -127,11 +129,11 @@ export default function S05ResultsPage() {
                 type="button"
                 onClick={() => setLockedPattern(pattern)}
                 className="flex w-full items-center gap-2.5 rounded-[18px] border border-dashed border-line-strong bg-canvas p-4 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-                aria-label={`잠김 · ${pattern.title} · 한 번 더 보이면 카드로 열려요`}
+                aria-label={`잠김 · ${getPatternCopy(pattern, tone).title} · 한 번 더 보이면 카드로 열려요`}
               >
                 <img src={lock} width={18} height={18} alt="" className="shrink-0" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-body-b text-ink-2">잠김 · {pattern.title} 1회 관찰</p>
+                  <p className="text-body-b text-ink-2">잠김 · {getPatternCopy(pattern, tone).title} 1회 관찰</p>
                   <p className="text-caption text-ink-3">한 번 더 보이면 카드로 열려요</p>
                 </div>
               </button>
@@ -164,7 +166,7 @@ export default function S05ResultsPage() {
         }}
         onCancel={() => setLockedPattern(null)}
       >
-        {lockedPattern?.title} 항목은 서로 다른 날짜에 한 번만 관찰됐어요. 기록이 더 쌓이면 반복되는 습관인지 확인할 수 있어요.
+        {lockedPattern ? getPatternCopy(lockedPattern, tone).title : ''} 항목은 서로 다른 날짜에 한 번만 관찰됐어요. 기록이 더 쌓이면 반복되는 습관인지 확인할 수 있어요.
       </ConfirmDialog>
     </ScreenLayout>
   )

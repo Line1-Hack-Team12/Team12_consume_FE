@@ -2,13 +2,14 @@ import Card from '../../components/ui/Card'
 import Chip from '../../components/ui/Chip'
 import { TextField } from '../../components/ui/Field'
 import { CAUSE_TAGS, MAX_CUSTOM_CAUSE_LENGTH, RESPONSE_STATUSES } from '../../constants/patternResponses'
+import { getPatternCopy } from '../../utils/patternCopy'
 
 export default function CauseResponseCard({ pattern, tone, response, customError, onToggleTag, onCustomCause, onStatus }) {
   const recommended = pattern.recommendedTags ?? []
   const options = [...new Set([...recommended, ...CAUSE_TAGS.map((item) => item.value)])]
     .map((value) => CAUSE_TAGS.find((item) => item.value === value))
     .filter(Boolean)
-  const question = pattern.copyByTone?.[tone]?.hypothesisQuestion ?? pattern.copyByTone?.coach?.hypothesisQuestion ?? '그날 보통 무슨 일이 있나요?'
+  const question = getPatternCopy(pattern, tone).hypothesisQuestion ?? '그날 보통 무슨 일이 있나요?'
 
   return (
     <Card padding="lg" className="flex flex-col gap-3.5">

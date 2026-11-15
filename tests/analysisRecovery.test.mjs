@@ -3,6 +3,7 @@ import test from 'node:test'
 import { toAnalysisJob } from '../src/api/adapters.js'
 import { savePatternResponse } from '../src/api/analysis.js'
 import { AnalysisScopeError, applyAnalysisNarratives, assertAnalysisScope, loadFinalAnalysis } from '../src/api/analysisRecovery.js'
+import { getPatternCopy } from '../src/utils/patternCopy.js'
 
 const snapshot = Object.freeze({ id: '91', sessionId: 7, analysisId: 7, slots: ['2026-10'], summary: { expenseCount: 2, expenseSum: 5000 } })
 const card = { patternId: 11, observedDays: 2, sumKrw: 4000, chainedSumKrw: 1000, evidenceGrade: 'NORMAL' }
@@ -102,6 +103,28 @@ test('기본 문장 대체와 일부 문장 누락은 완전한 설명 복구로
   const partial = applyAnalysisNarratives(original, complete({ narratives: [] }), 'coach')
   assert.equal(partial.recovery.narrativesIncomplete, true)
   assert.equal(partial.patterns[0], original.patterns[0])
+})
+
+test('새 제목·관찰 문구를 말투별로 보존하고 말투를 왕복하면 해당 문구를 읽는다', async (context) => {
+  const original = await resultFixture(context)
+  const friend = applyAnalysisNarratives(original, complete({ narratives: [{ patternId: 11, title: '친구 제목', observation: '친구 관찰', hypothesisQuestion: '친구 질문', action: '친구 행동' }] }), 'friend')
+  const grandma = applyAnalysisNarratives(friend, complete({ narratives: [{ patternId: 11, title: '할머니 제목', observation: '할머니 관찰', hypothesisQuestion: '할머니 질문', action: '할머니 행동' }] }), 'grandma')
+  assert.equal(getPatternCopy(grandma.patterns[0], 'grandma').title, '할머니 제목')
+  assert.equal(getPatternCopy(grandma.patterns[0], 'grandma').observation, '할머니 관찰')
+  assert.equal(getPatternCopy(grandma.patterns[0], 'friend').title, '친구 제목')
+  assert.equal(getPatternCopy(grandma.patterns[0], 'friend').observation, '친구 관찰')
+  assert.equal(grandma.patterns[0].sumKrw, original.patterns[0].sumKrw)
+  assert.equal(grandma.patterns[0].evidence, original.patterns[0].evidence)
+})
+
+test('일부 문장만 새로 와도 표시 가능한 문구는 반영하고 나머지는 기존 값으로 보완한다', async (context) => {
+  const original = await resultFixture(context)
+  const previous = applyAnalysisNarratives(original, complete(), 'coach')
+  const partial = applyAnalysisNarratives(previous, complete({ narratives: [{ patternId: 11, title: '새 제목', observation: '새 관찰', hypothesisQuestion: ' ', action: null }] }), 'friend')
+  assert.deepEqual(getPatternCopy(partial.patterns[0], 'friend'), {
+    title: '새 제목', observation: '새 관찰', hypothesisQuestion: '원인 질문', action: '행동 제안',
+  })
+  assert.equal(partial.recovery.narrativesIncomplete, true)
 })
 
 test('다른 분석·카드·중복 카드의 설명은 기존 결과에 적용하지 않는다', async (context) => {

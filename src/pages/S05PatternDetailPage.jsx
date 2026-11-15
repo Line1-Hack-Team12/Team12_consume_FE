@@ -11,6 +11,7 @@ import { useAnalysisSession } from '../hooks/analysisSessionContext'
 import { useAppNavigation } from '../hooks/navigationContext'
 import usePatternResponse from '../hooks/usePatternResponse'
 import { S05_PREVIEW_ANALYSIS } from '../mocks/s05Preview'
+import { getPatternCopy } from '../utils/patternCopy'
 import CauseResponseCard from './S05Detail/CauseResponseCard'
 import CostBreakdownCard from './S05Detail/CostBreakdownCard'
 import EvidenceCard from './S05Detail/EvidenceCard'
@@ -51,12 +52,13 @@ export default function S05PatternDetailPage({ params }) {
     )
   }
 
-  const action = pattern.copyByTone?.[tone]?.action ?? pattern.copyByTone?.coach?.action ?? '다음 소비 전에 한 번 더 확인해 보세요.'
+  const copy = getPatternCopy(pattern, tone)
+  const action = copy.action ?? '다음 소비 전에 한 번 더 확인해 보세요.'
   const nextPattern = result.patterns[result.patterns.findIndex((item) => item.id === pattern.id) + 1]
 
   return (
     <ScreenLayout
-      title={pattern.title}
+      title={copy.title}
       onBack={() => leave(SCREEN.S05)}
       backFallback={SCREEN.S05}
       backIcon={<img src={back} width={24} height={24} alt="" className="block" />}
@@ -73,7 +75,7 @@ export default function S05PatternDetailPage({ params }) {
       }
     >
       <div className="flex flex-wrap items-center gap-1.5">
-        <p className="text-body-b text-ink-2">{pattern.observation}</p>
+        <p className="text-body-b text-ink-2">{copy.observation}</p>
         <Badge tone={pattern.evidenceGrade === 'strong' ? 'strong' : 'normal'}>{pattern.evidenceGrade === 'strong' ? '근거 강함' : '근거 보통'}</Badge>
       </div>
 

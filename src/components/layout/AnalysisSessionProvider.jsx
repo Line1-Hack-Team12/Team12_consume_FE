@@ -150,6 +150,7 @@ export default function AnalysisSessionProvider({ children }) {
       if (latest?.snapshotId !== current.snapshotId || latest?.analysisId !== current.analysisId) return false
       const updated = applyAnalysisNarratives(latest, response, tone)
       dispatch({ type: 'analysis', analysis: updated })
+      dispatch({ type: 'settings', patch: { tone } })
       dispatch({ type: 'narrativeError', value: updated.recovery.narrativesIncomplete ? '설명을 모두 생성하지 못해 기존 문장이나 기본 표현을 보여드려요. 숫자와 근거는 그대로예요.' : '' })
       return !updated.recovery.narrativesIncomplete
     } catch (error) {
@@ -158,7 +159,6 @@ export default function AnalysisSessionProvider({ children }) {
       }
       return false
     } finally {
-      if (isCurrent()) dispatch({ type: 'settings', patch: { tone } })
       narrativeSavingRef.current = false; setToneBusy(false)
     }
   }, [])

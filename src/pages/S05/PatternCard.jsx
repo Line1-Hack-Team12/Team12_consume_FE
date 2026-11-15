@@ -6,21 +6,23 @@ import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import IconBox from '../../components/ui/IconBox'
 import { formatKRW } from '../../utils/format'
+import { getPatternCopy } from '../../utils/patternCopy'
 
 const ICONS = { moon, rain, sparkle }
 
 // S05 카드 앞면 · 수치·정렬·근거 등급은 분석 결과를 그대로 표시한다.
-export default function PatternCard({ pattern, featured = false, onOpen }) {
+export default function PatternCard({ pattern, tone = 'coach', featured = false, onOpen }) {
   const titleId = `pattern-${pattern.id}`
+  const copy = getPatternCopy(pattern, tone)
   const details = (
     <>
       <IconBox name={pattern.icon} tone={pattern.iconTone}>
         {ICONS[pattern.icon] ? <img src={ICONS[pattern.icon]} width={20} height={20} alt="" className="shrink-0" /> : null}
       </IconBox>
       <div className="flex min-w-0 flex-col gap-0.5">
-        <h3 id={titleId} className="text-body-b">{pattern.title}</h3>
+        <h3 id={titleId} className="text-body-b">{copy.title}</h3>
         <p className="-mr-0.5 text-caption-m text-ink-2">
-          {pattern.observation} · {pattern.amountLabel ?? '월 환산'} <span className="whitespace-nowrap">{formatKRW(pattern.monthlyAmountKrw)}</span>
+          {copy.observation} · {pattern.amountLabel ?? '월 환산'} <span className="whitespace-nowrap">{formatKRW(pattern.monthlyAmountKrw)}</span>
         </p>
         <p className="text-micro text-ink-3">{pattern.basis}</p>
       </div>
@@ -39,7 +41,7 @@ export default function PatternCard({ pattern, featured = false, onOpen }) {
         <button
           type="button"
           onClick={onOpen}
-          aria-label={`${pattern.title} · 진짜 비용과 원인 보기`}
+          aria-label={`${copy.title} · 진짜 비용과 원인 보기`}
           className="absolute inset-0 w-full rounded-[18px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
         />
       )}
