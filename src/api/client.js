@@ -1,4 +1,5 @@
 import { API_BASE } from './config.js'
+import { parseApiJson } from './parseJson.js'
 
 export class ApiError extends Error {
   constructor(message, { status, body } = {}) {
@@ -47,7 +48,7 @@ export async function apiRequest(path, { method = 'GET', query, json, form, sign
   let body = null
   if (text) {
     try {
-      body = JSON.parse(text)
+      body = parseApiJson(text)
     } catch {
       body = text
     }

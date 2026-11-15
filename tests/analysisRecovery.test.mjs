@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { toAnalysisJob } from '../src/api/adapters.js'
+import { savePatternResponse } from '../src/api/analysis.js'
 import { AnalysisScopeError, applyAnalysisNarratives, assertAnalysisScope, loadFinalAnalysis } from '../src/api/analysisRecovery.js'
 
 const snapshot = Object.freeze({ id: '91', sessionId: 7, analysisId: 7, slots: ['2026-10'], summary: { expenseCount: 2, expenseSum: 5000 } })
@@ -116,4 +117,35 @@ test('패턴 0건은 정상 결과로 유지하며 임의 카드를 생성하지
   const result = await loadFinalAnalysis(snapshot)
   assert.deepEqual(result.patterns, [])
   assert.equal(result.recovery.narrativesIncomplete, false)
+})
+
+test('서버의 큰 패턴 ID를 상세 조회·근거 연결·응답 저장까지 그대로 전달한다', async (context) => {
+  const calls = []
+  const id = '6210964112925012238'
+  const adjacentId = '6210964112925012239'
+  // 숫자 리터럴/Response.json을 쓰면 테스트 준비 단계에서 이미 반올림되므로 원문 JSON을 사용한다.
+  const rawCard = (patternId) => `{"patternId":${patternId},"observedDays":2,"sumKrw":4000,"chainedSumKrw":1000}`
+  context.mock.method(globalThis, 'fetch', async (url, init) => {
+    calls.push([url, init.method])
+    if (url.endsWith('/result')) return new Response(`{"analysisId":7,"snapshotId":91,"summary":{"totalExpenseKrw":10000,"transactionCount":4},"cards":[${rawCard(id)},${rawCard(adjacentId)}]}`)
+    if (url.endsWith('/report')) return json({})
+    if (init.method === 'PUT') return json({ revision: 1, responseStatus: 'ANSWERED', causeTags: ['습관'] })
+    const requestedId = url.split('/').at(-1)
+    assert.ok([id, adjacentId].includes(requestedId))
+    return new Response(`{"analysisId":7,"patternId":${requestedId},"evidenceTransactions":[{"transactionId":${requestedId},"amountKrw":4000}]}`)
+  })
+  const result = await loadFinalAnalysis(snapshot)
+  assert.deepEqual(result.recovery.missingDetails, [])
+  assert.deepEqual(result.patterns.map((pattern) => [pattern.id, pattern.evidence[0].id]), [[id, id], [adjacentId, adjacentId]])
+  assert.equal(result.patterns[0].sumKrw, 4000)
+  const saved = await savePatternResponse({
+    pattern: result.patterns[0], current: { revision: 0 },
+    replacement: { response_status: 'answered', cause_tags: ['습관'], custom_cause: '' },
+  })
+  assert.equal(saved.revision, 1)
+  assert.deepEqual(calls, [
+    ['/api/analyses/7/result', 'GET'], ['/api/sessions/7/report', 'GET'],
+    [`/api/analyses/7/patterns/${id}`, 'GET'], [`/api/analyses/7/patterns/${adjacentId}`, 'GET'],
+    [`/api/analyses/7/patterns/${id}/response`, 'PUT'],
+  ])
 })
