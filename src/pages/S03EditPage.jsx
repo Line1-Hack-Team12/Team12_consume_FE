@@ -12,6 +12,8 @@ import { useAppNavigation } from '../hooks/navigationContext'
 import { formatNumber } from '../utils/format'
 import { validateTransaction } from '../utils/transactionValidation'
 import { buildSlots, formatMonth } from '../utils/months'
+import { moveTransactionDate } from '../utils/transactionEditing'
+import { USE_MOCK } from '../api/config'
 
 function lastDay(month) {
   const [y, m] = month.split('-').map(Number)
@@ -21,14 +23,24 @@ function lastDay(month) {
 // S03-E 내역 수정하기
 export default function S03EditPage({ params }) {
   const { back } = useAppNavigation()
-  const { draft, settings, updateTransaction, syncBusy, syncError } = useAnalysisSession()
+  const { draft, settings, updateTransaction, syncBusy, syncError, confirmationBackups } = useAnalysisSession()
   const original = draft?.transactions.find((t) => t.id === params?.id)
-  const [form, setForm] = useState(() => (original ? { ...original, amountText: formatNumber(original.amountKrw) } : null))
+  const [form, setForm] = useState(() => {
+    if (!original) return null
+    const backupIndex = params?.restoreDraft == null ? -1 : Number(params.restoreDraft)
+    const saved = Number.isInteger(backupIndex) ? confirmationBackups[backupIndex]?.transactions.find((row) => row.id === original.id) : null
+    const restored = { ...original }
+    if (saved) {
+      const fields = ['date', 'time', 'merchant', 'amountKrw', 'slotMonth', ...(USE_MOCK ? ['direction', 'kind', 'category', 'subcategory'] : [])]
+      for (const key of fields) restored[key] = saved[key]
+    }
+    return { ...restored, amountText: formatNumber(restored.amountKrw) }
+  })
   const [showErrors, setShowErrors] = useState(false)
   const allowLeaveRef = useRef(false)
   const hasChanges = Boolean(original && form && (
     form.amountText !== formatNumber(original.amountKrw)
-    || ['date', 'time', 'merchant', 'direction', 'kind', 'category', 'subcategory'].some((key) => (form[key] ?? '') !== (original[key] ?? ''))
+    || ['date', 'time', 'merchant', 'direction', 'kind', 'category', 'subcategory', 'slotMonth'].some((key) => (form[key] ?? '') !== (original[key] ?? ''))
   ))
   const blocker = useBlocker(() => hasChanges && !allowLeaveRef.current)
 
@@ -54,7 +66,7 @@ export default function S03EditPage({ params }) {
 
   const amountKrw = Number(form.amountText.replace(/[^\d]/g, '')) || 0
   const candidate = { ...form, amountKrw, time: form.time || null, subcategory: form.subcategory || null }
-  const errors = validateTransaction(candidate)
+  const errors = validateTransaction(candidate, { slots: buildSlots(settings.lastMonth, settings.monthCount) })
   const hasErrors = Object.keys(errors).length > 0
   const subs = CATEGORIES.find((c) => c.value === form.category)?.subs ?? []
   const set = (patch) => setForm((f) => ({ ...f, ...patch }))
@@ -70,7 +82,7 @@ export default function S03EditPage({ params }) {
     }
     const rest = { ...candidate }
     delete rest.amountText
-    if (await updateTransaction(original.id, { ...rest, included: true, reviewStatus: original.reviewReasons.length ? 'edited' : original.reviewStatus })) done()
+    if (await updateTransaction(original.id, { ...rest, included: original.included, reviewStatus: original.included ? (original.reviewReasons.length ? 'edited' : original.reviewStatus) : 'excluded' })) done()
   }
 
   const keepAsIs = async () => {
@@ -110,12 +122,15 @@ export default function S03EditPage({ params }) {
         </>
       }
     >
+      <fieldset disabled={syncBusy} className="contents">
       <p className="-mt-3 text-caption text-ink-3">
         <span className="text-danger">*</span> 표시는 필수 항목이에요. 시각은 비워둘 수 있어요.
       </p>
       <SelectField label="기록의 달" required value={form.slotMonth || ''} placeholder="해당하는 달을 골라주세요"
+        error={err('slotMonth')}
         options={buildSlots(settings.lastMonth, settings.monthCount).map((value) => ({ value, label: formatMonth(value) }))}
-        onChange={(e) => set({ slotMonth: e.target.value })} />
+        onChange={(e) => set({ slotMonth: e.target.value, date: moveTransactionDate(form.date, e.target.value) })} />
+      <p className="text-caption text-ink-3">기록의 달을 바꾸면 날짜도 같은 달로 옮겨요. 옮긴 날짜를 확인해 주세요.</p>
       <TextField
         label="날짜"
         required
@@ -151,7 +166,7 @@ export default function S03EditPage({ params }) {
           required
           value={form.category}
           options={CATEGORIES.map((c) => ({ value: c.value, label: c.label }))}
-          onChange={(e) => set({ category: e.target.value, subcategory: null })}
+          onChange={(e) => set({ category: e.target.value, ...(USE_MOCK ? { subcategory: null } : {}) })}
           error={err('category')}
         />
         <SelectField
@@ -160,15 +175,17 @@ export default function S03EditPage({ params }) {
           value={form.subcategory ?? ''}
           placeholder="없음"
           options={subs.map((s) => ({ value: s, label: s }))}
-          disabled={subs.length === 0}
+          disabled={!USE_MOCK || subs.length === 0}
           onChange={(e) => set({ subcategory: e.target.value || null })}
         />
       </div>
+      {!USE_MOCK ? <p className="text-caption text-ink-3">하위 분류 변경은 현재 서버에서 지원하지 않아요. 기존 하위 분류를 유지해요.</p> : null}
       {showErrors && hasErrors ? (
         <Note tone="danger" icon="alert">
           빨간 칸을 고쳐야 저장할 수 있어요.
         </Note>
       ) : null}
+      </fieldset>
       <ConfirmDialog
         open={blocker.state === 'blocked'}
         title="수정 중인 내역이 있어요"

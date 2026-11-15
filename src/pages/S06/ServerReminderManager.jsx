@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react'
-import { getNotifications, sendDemoNotification, updateNotification } from '../../api/analysis'
+import { useRef, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { sendDemoNotification, updateNotification } from '../../api/analysis'
+import { invalidateSessionQueries, notificationsQuery } from '../../api/sessionQueries'
 import ScreenLayout from '../../components/layout/ScreenLayout'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -12,42 +14,46 @@ import { SCREEN } from '../../constants/screens'
 import { useAppNavigation } from '../../hooks/navigationContext'
 import DemoReminderDialog from './DemoReminderDialog'
 
-export default function ServerReminderManager({ sessionId }) {
+export default function ServerReminderManager({ sessionId, snapshotId }) {
   const { navigate } = useAppNavigation()
-  const [rules, setRules] = useState([])
-  const [loading, setLoading] = useState(true)
+  const client = useQueryClient()
+  const options = notificationsQuery(sessionId, snapshotId)
+  const query = useQuery(options)
+  const rules = query.data?.notifications ?? []
+  const loading = query.isPending
+  const actionLock = useRef(false)
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  const [attempt, setAttempt] = useState(0)
+  const [actionError, setError] = useState('')
+  const error = actionError || query.error?.message || ''
   const [demo, setDemo] = useState(null)
-  useEffect(() => {
-    let active = true
-    getNotifications(sessionId).then((r) => { if (active) { setRules(r.notifications ?? []); setLoading(false) } }, (err) => { if (active) { setError(err.message); setLoading(false) } })
-    return () => { active = false }
-  }, [sessionId, attempt])
   const update = async (rule, patch) => {
-    if (busy) return
+    if (actionLock.current) return
     const message = patch.alertTime ? validateReminderTime(patch.alertTime) : patch.isEnabled ? validateReminderTime(rule.alertTime) : ''
     if (message) { setError(message); return }
+    actionLock.current = true
     setBusy(true); setError('')
     try {
+      await client.cancelQueries({ queryKey: options.queryKey })
       await updateNotification(rule.notificationId, patch)
-      setRules((old) => old.map((r) => r.notificationId === rule.notificationId ? { ...r, ...patch } : r))
+      client.setQueryData(options.queryKey, (old) => old ? { ...old, notifications: old.notifications.map((r) => r.notificationId === rule.notificationId ? { ...r, ...patch } : r) } : old)
+      await invalidateSessionQueries(client, sessionId, snapshotId, ['notifications', 'completion'])
     } catch (err) { setError(err.message) }
-    finally { setBusy(false) }
+    finally { actionLock.current = false; setBusy(false) }
   }
   const send = async (rule) => {
+    if (actionLock.current) return
+    actionLock.current = true
     setBusy(true); setError('')
     try { setDemo(await sendDemoNotification(rule.notificationId)) }
     catch (err) { setError(err.message) }
-    finally { setBusy(false) }
+    finally { actionLock.current = false; setBusy(false) }
   }
   return <ScreenLayout title="알림 설정과 관리" onBack={() => navigate(SCREEN.S05)} footer={<>
     <Button disabled={busy || loading} onClick={() => navigate(SCREEN.S10)}>완료</Button>
     <Button variant="secondary" disabled={busy} onClick={() => navigate(SCREEN.S05)}>결과 홈으로</Button>
   </>}>
     {loading ? <Note>알림 규칙을 불러오고 있어요.</Note> : !rules.length ? <Note>아직 설정된 알림이 없어요. 요일·시각 근거가 있는 습관을 확인해 주세요.</Note> : null}
-    {error ? <Note tone="warn"><p role="alert">{error}</p><Button size="sm" variant="secondary" onClick={() => { setError(''); setAttempt((n) => n + 1) }}>다시 확인</Button></Note> : null}
+    {error ? <Note tone="warn"><p role="alert">{error}</p><Button size="sm" variant="secondary" disabled={busy || query.isFetching} onClick={() => { setError(''); query.refetch() }}>다시 확인</Button></Note> : null}
     {rules.map((rule) => <Card key={rule.notificationId} className="flex flex-col gap-3">
       <p className="text-caption text-brand">{rule.sourceLabel} · 인앱 DEMO</p>
       <h2 className="text-heading">{rule.scheduleTitle}</h2>

@@ -5,11 +5,11 @@ const ZIP_HEADER = [0x50, 0x4b, 0x03, 0x04]
 const PDF_HEADER = [0x25, 0x50, 0x44, 0x46, 0x2d] // %PDF-
 
 export const REJECT_REASON = {
-  imageType: '보조 내역은 JPG·PNG·WebP 캡처 또는 PDF로 추가해 주세요',
+  imageType: '보조 내역은 JPG·JPEG·PNG·WebP 캡처로 추가해 주세요',
   bankType: '토스뱅크에서 발급한 .xlsx 거래내역 파일을 선택해 주세요',
   size: '보조 내역은 파일당 10MB까지 올릴 수 있어요',
   bankSize: '거래내역 파일은 20MB까지 올릴 수 있어요',
-  count: '캡처·PDF는 한 번에 10개까지만 추가할 수 있어요',
+  count: '캡처는 한 번에 10개까지만 추가할 수 있어요',
   decode: '파일을 읽을 수 없어요. 원본 파일을 다시 선택해 주세요',
 }
 
@@ -60,11 +60,18 @@ export async function validateFiles(files, { kind = 'image', decodeImage = canDe
   for (const [index, file] of files.entries()) {
     const mime = file.type.toLowerCase()
     const isBank = kind === 'file'
+<<<<<<< HEAD
     const isPdf = !isBank && /\.pdf$/i.test(file.name)
     const base = { id: `local_${crypto.randomUUID()}`, file, name: file.name, size: file.size, kind: isPdf ? 'pdf' : kind }
     const validType = isBank
       ? /\.xlsx$/i.test(file.name) && ['', 'application/octet-stream', 'application/x-ole-storage', BANK_FILE_MIME].includes(mime)
       : isPdf ? ['', 'application/octet-stream', PDF_MIME_TYPE].includes(mime) : IMAGE_MIME_TYPES.includes(mime)
+=======
+    const base = { id: `local_${crypto.randomUUID()}`, file, name: file.name, size: file.size, kind }
+    const validType = isBank
+      ? /\.xlsx$/i.test(file.name) && ['', 'application/octet-stream', 'application/x-ole-storage', BANK_FILE_MIME].includes(mime)
+      : /\.(jpe?g|png|webp)$/i.test(file.name) && IMAGE_MIME_TYPES.includes(mime)
+>>>>>>> 09cd1b1c21dbb224716d5fa31756a46bf74fd521
     let reason
     if (!isBank && index >= MAX_FILES_PER_UPLOAD) reason = REJECT_REASON.count
     else if (!validType) reason = isBank ? REJECT_REASON.bankType : REJECT_REASON.imageType

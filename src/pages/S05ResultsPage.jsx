@@ -39,7 +39,7 @@ export default function S05ResultsPage() {
   }
 
   const tone = TONES.some((item) => item.value === settings.tone) ? settings.tone : 'coach'
-  const summary = result.summaryByTone[tone] ?? result.summaryByTone.coach
+  const summary = result.summaryByTone[tone] || result.summaryByTone.coach || '확정한 기록의 지출 요약이에요.'
   const categorySummary = result.topCategories.map((category) => `${category.label} ${category.sharePercent}%`).join(' · ')
   const comparison = result.monthComparison
   const canAddMonths = result.slots.length < 3
@@ -90,7 +90,16 @@ export default function S05ResultsPage() {
           </Chip>
         ))}
       </div>
-      {narrativeError ? <Note tone="warn">{narrativeError}<Button size="sm" variant="secondary" disabled={toneBusy} onClick={() => setTone(tone)}>말투 다시 불러오기</Button></Note> : null}
+      {narrativeError || result.recovery?.narrativesIncomplete ? <Note tone="warn">
+        <p role="alert">{narrativeError || '설명을 모두 불러오지 못했어요. 지출 금액과 카드 근거는 유지돼요.'}</p>
+        <p className="mt-1">설명을 다시 만들어도 숫자와 근거는 바뀌지 않아요.</p>
+        <Button size="sm" variant="secondary" className="mt-2" disabled={toneBusy} onClick={() => setTone(tone)}>{toneBusy ? '설명 생성 중…' : '설명만 다시 생성'}</Button>
+      </Note> : null}
+      {result.mode === 'server' && !narrativeError && !result.recovery?.narrativesIncomplete ? <Button size="sm" variant="secondary" disabled={toneBusy} onClick={() => setTone(tone)}>{toneBusy ? '설명 생성 중…' : '설명 다시 생성'}</Button> : null}
+      {result.recovery?.reportUnavailable || result.recovery?.missingDetails?.length > 0 ? <Note tone="warn">
+        <p>일부 상세 자료를 불러오지 못했어요. 확인된 분석 결과는 그대로 볼 수 있어요.</p>
+        <Button size="sm" variant="secondary" className="mt-2" disabled={toneBusy} onClick={() => navigate(SCREEN.S03_P)}>결과 자료 다시 불러오기</Button>
+      </Note> : null}
 
       <Button variant="secondary" onClick={() => navigate(SCREEN.S08, { snapshotId: result.snapshotId })}>리포트 상세 →</Button>
 

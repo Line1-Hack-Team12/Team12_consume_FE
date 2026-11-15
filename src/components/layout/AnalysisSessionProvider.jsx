@@ -5,6 +5,10 @@ import * as sessionApi from '../../api/sessions'
 import { DEFAULT_MONTH_COUNT, DEFAULT_TONE } from '../../constants/limits'
 import { buildSlots } from '../../utils/months'
 import { regenerateNarratives, savePatternResponse } from '../../api/analysis'
+import { saveTransactionEdit } from '../../api/transactionEdits'
+import { applyAnalysisNarratives } from '../../api/analysisRecovery'
+import { confirmReviewedDraft, fetchReviewDraft, ReviewConflictError } from '../../api/reviewConfirmation'
+import { recoverReviewDraft } from '../../utils/draftConflict'
 import { AnalysisSessionContext } from '../../hooks/analysisSessionContext'
 import { createPatternResponseStore } from '../../mocks/patternResponses'
 import { createSavingsPlanStore } from '../../mocks/plans'
@@ -21,6 +25,8 @@ const initialState = {
   sessionId: null, // 백엔드 세션 ID (API 모드)
   syncError: null, // 서버 반영 실패 문구
   narrativeError: '',
+  confirmationConflict: null,
+  confirmationBackups: [],
 }
 
 function reducer(state, action) {
@@ -48,7 +54,15 @@ function reducer(state, action) {
     case 'consent':
       return { ...state, consent: action.value }
     case 'draft':
-      return { ...state, draft: action.draft, confirmed: false, snapshot: null, analysis: null }
+      return { ...state, draft: action.draft, confirmed: false, snapshot: null, analysis: null, confirmationConflict: null, confirmationBackups: [] }
+    case 'confirmationConflict':
+      return { ...state, confirmed: false, snapshot: null, analysis: null,
+        confirmationConflict: { refreshError: action.error.refreshError },
+        confirmationBackups: [...state.confirmationBackups, state.draft] }
+    case 'confirmationRefreshError':
+      return { ...state, confirmationConflict: { ...state.confirmationConflict, refreshError: action.message } }
+    case 'recoverConfirmation':
+      return { ...state, draft: action.draft, confirmed: false, snapshot: null, analysis: null, confirmationConflict: null, syncError: null }
     case 'updateTransaction': {
       if (!state.draft) return state
       const transactions = state.draft.transactions.map((t) => (t.id === action.id ? { ...t, ...action.patch } : t))
@@ -60,7 +74,13 @@ function reducer(state, action) {
       const duplicateGroups = state.draft.duplicateGroups.map((g) =>
         g.id === action.id ? { ...g, decision: action.decision, reviewed: true } : g,
       )
-      return { ...state, draft: { ...state.draft, duplicateGroups, revision: action.revision ?? (state.draft.revision == null ? null : state.draft.revision + 1) }, confirmed: false, snapshot: null, analysis: null }
+      const group = duplicateGroups.find((g) => g.id === action.id)
+      // separate는 원본 거래를 각각 복원한다. merge는 원본을 삭제하지 않고 합계에서만 묶는다.
+      const transactions = action.decision === 'separate'
+        ? state.draft.transactions.map((t) => group.memberIds.includes(t.id) && !t.included
+          ? { ...t, included: true, reviewStatus: t.reviewReasons.length ? 'pending' : 'ok' } : t)
+        : state.draft.transactions
+      return { ...state, draft: { ...state.draft, transactions, duplicateGroups, revision: action.revision ?? (state.draft.revision == null ? null : state.draft.revision + 1) }, confirmed: false, snapshot: null, analysis: null }
     }
     case 'confirmed':
       return { ...state, confirmed: action.value }
@@ -68,7 +88,7 @@ function reducer(state, action) {
       return { ...state, snapshot: action.snapshot, analysis: null }
     case 'analysis':
       if (action.analysis?.snapshotId !== state.snapshot?.id) return state
-      return { ...state, analysis: action.analysis }
+      return { ...state, analysis: action.analysis, narrativeError: '' }
     case 'sessionId':
       return { ...state, sessionId: action.value }
     case 'syncError':
@@ -85,6 +105,7 @@ export default function AnalysisSessionProvider({ children }) {
   const [syncBusy, setSyncBusy] = useState(false)
   const [toneBusy, setToneBusy] = useState(false)
   const savingRef = useRef(false)
+  const narrativeSavingRef = useRef(false)
   const [patternResponseStore] = useState(() => createPatternResponseStore({ saveResponse: savePatternResponse }))
   const [savingsPlanStore] = useState(() => createSavingsPlanStore({ responseStore: patternResponseStore }))
   const selectedPlan = useSyncExternalStore(savingsPlanStore.subscribe, savingsPlanStore.getSelectedPlan, savingsPlanStore.getSelectedPlan)
@@ -115,31 +136,36 @@ export default function AnalysisSessionProvider({ children }) {
   const setTone = useCallback(async (tone) => {
     const current = stateRef.current.analysis
     if (current?.mode !== 'server') { dispatch({ type: 'settings', patch: { tone } }); return }
+    const isCurrent = () => stateRef.current.analysis?.snapshotId === current.snapshotId && stateRef.current.analysis?.analysisId === current.analysisId
+    if (narrativeSavingRef.current) return false
+    narrativeSavingRef.current = true
     setToneBusy(true)
     try {
       const response = await regenerateNarratives(current.analysisId, { coach: 'COACH', friend: 'FRIEND', grandma: 'GRANDMOTHER' }[tone])
-      if (stateRef.current.analysis?.snapshotId !== current.snapshotId) return
-      dispatch({ type: 'analysis', analysis: { ...current, summaryByTone: { ...current.summaryByTone, [tone]: response.overallComment }, patterns: current.patterns.map((pattern) => {
-        const copy = response.narratives?.find((n) => String(n.patternId) === pattern.id)
-        return copy ? { ...pattern, copyByTone: { ...pattern.copyByTone, [tone]: { observation: copy.observation, hypothesisQuestion: copy.hypothesisQuestion, action: copy.action } } } : pattern
-      }) } })
-      dispatch({ type: 'narrativeError', value: '' })
-    } catch {
-      dispatch({ type: 'narrativeError', value: '말투를 바꾸지 못해 기본 표현으로 보여드려요. 숫자와 근거는 그대로예요.' })
-    } finally { dispatch({ type: 'settings', patch: { tone } }); setToneBusy(false) }
+      const latest = stateRef.current.analysis
+      if (latest?.snapshotId !== current.snapshotId || latest?.analysisId !== current.analysisId) return false
+      const updated = applyAnalysisNarratives(latest, response, tone)
+      dispatch({ type: 'analysis', analysis: updated })
+      dispatch({ type: 'narrativeError', value: updated.recovery.narrativesIncomplete ? '설명을 모두 생성하지 못해 기존 문장이나 기본 표현을 보여드려요. 숫자와 근거는 그대로예요.' : '' })
+      return !updated.recovery.narrativesIncomplete
+    } catch (error) {
+      if (isCurrent()) {
+        dispatch({ type: 'narrativeError', value: error.message || '설명을 다시 만들지 못했어요. 숫자와 근거는 그대로예요.' })
+      }
+      return false
+    } finally {
+      if (isCurrent()) dispatch({ type: 'settings', patch: { tone } })
+      narrativeSavingRef.current = false; setToneBusy(false)
+    }
   }, [])
 
   // S03-E·S03 검토 큐 처리 → PUT /api/transactions/{id}, 큐를 다 처리하면 POST /review/queue/confirm
   const updateTransaction = useCallback(
     async (id, patch) => {
       const before = stateRef.current.draft?.transactions.find((t) => t.id === id)
-      if (!before || savingRef.current) return false
+      if (!before || savingRef.current || stateRef.current.confirmationConflict) return false
       if (USE_MOCK) { dispatch({ type: 'updateTransaction', id, patch }); return true }
       if (!before.serverId) return false
-      if (['subcategory', 'slotMonth'].some((key) => key in patch && (patch[key] ?? null) !== (before[key] ?? null)) || ('time' in patch && before.time && !patch.time)) {
-        reportError(new Error('하위 분류·기록 월 변경과 기존 시각 삭제는 아직 저장할 수 없어요. 입력은 유지했으니 기존 값으로 되돌리거나 나중에 다시 저장해 주세요.'))
-        return false
-      }
       savingRef.current = true
       setSyncBusy(true)
       dispatch({ type: 'syncError', value: null })
@@ -147,15 +173,9 @@ export default function AnalysisSessionProvider({ children }) {
       const action = patch.included === false ? 'EXCLUDE' : patch.included === true && !before.included ? 'RESTORE' : patch.reviewStatus === 'kept' ? 'KEEP' : 'EDIT'
       const sessionId = stateRef.current.sessionId
       try {
-          const result = await sessionApi.updateTransaction(before.serverId, next, action)
-          const changedFields = ['direction', 'kind', 'category', 'subcategory', 'slotMonth'].filter((key) => (next[key] ?? null) !== (before[key] ?? null))
-          if (changedFields.length) {
-            const saved = await sessionApi.getTransaction(before.serverId)
-            const actual = { ...saved, kind: saved.kind ?? saved.type, direction: ['입금', 'in'].includes(saved.direction) ? 'in' : ['출금', 'out'].includes(saved.direction) ? 'out' : 'unknown' }
-            if (changedFields.some((key) => (actual[key] ?? null) !== (next[key] ?? null))) throw new Error('서버에서 수정 내용을 반영하지 못했어요. 입력은 유지했으니 다시 저장해 주세요.')
-          }
+          const result = await saveTransactionEdit(before, next, action)
           const rows = stateRef.current.draft.transactions.map((t) => t.id === id ? next : t)
-          const queue = rows.filter((t) => t.reviewReasons.length > 0)
+          const queue = rows.filter((t) => t.reviewReasons.some((reason) => reason !== 'server_changed'))
           if (queue.length > 0 && queue.every((t) => t.reviewStatus !== 'pending') && before.reviewStatus === 'pending') {
             await sessionApi.confirmReviewQueue(sessionId, queue.map((t) => ({ transactionId: t.serverId, applySuggested: false })))
           }
@@ -171,7 +191,7 @@ export default function AnalysisSessionProvider({ children }) {
   const setDuplicateDecision = useCallback(
     async (id, decision) => {
       const group = stateRef.current.draft?.duplicateGroups.find((g) => g.id === id)
-      if (!group || savingRef.current) return false
+      if (!group || savingRef.current || stateRef.current.confirmationConflict) return false
       if (USE_MOCK) { dispatch({ type: 'duplicateDecision', id, decision }); return true }
       savingRef.current = true; setSyncBusy(true)
       try {
@@ -188,7 +208,7 @@ export default function AnalysisSessionProvider({ children }) {
   // S03 확인 체크 → POST /review/check
   const setConfirmed = useCallback(
     async (value) => {
-      if (savingRef.current) return
+      if (savingRef.current || stateRef.current.confirmationConflict) return
       if (USE_MOCK || !value) { dispatch({ type: 'confirmed', value }); return }
       savingRef.current = true; setSyncBusy(true)
       try {
@@ -215,6 +235,44 @@ export default function AnalysisSessionProvider({ children }) {
     return draft
   }, [])
 
+  const confirmReview = useCallback(async () => {
+    const current = stateRef.current
+    if (savingRef.current || current.syncError || current.confirmationConflict || !current.confirmed || !current.draft) {
+      throw new Error('검토·저장 상태를 먼저 확인해 주세요.')
+    }
+    savingRef.current = true; setSyncBusy(true)
+    try {
+      if (USE_MOCK) return null
+      const slots = buildSlots(current.settings.lastMonth, current.settings.monthCount)
+      const result = await confirmReviewedDraft(current.sessionId, current.draft, slots)
+      if (stateRef.current.sessionId !== current.sessionId || stateRef.current.draft !== current.draft) {
+        throw new Error('검토 중인 세션이 바뀌었어요. 현재 내역을 다시 확인해 주세요.')
+      }
+      return result
+    } catch (error) {
+      if (error instanceof ReviewConflictError && stateRef.current.sessionId === current.sessionId) {
+        dispatch({ type: 'confirmationConflict', error })
+      }
+      throw error
+    } finally { savingRef.current = false; setSyncBusy(false) }
+  }, [])
+
+  const reloadAfterConflict = useCallback(async () => {
+    const current = stateRef.current
+    if (savingRef.current || !current.confirmationConflict) return false
+    savingRef.current = true; setSyncBusy(true)
+    try {
+      const slots = buildSlots(current.settings.lastMonth, current.settings.monthCount)
+      const latest = await fetchReviewDraft(current.sessionId, slots)
+      if (stateRef.current.sessionId !== current.sessionId) return false
+      dispatch({ type: 'recoverConfirmation', draft: recoverReviewDraft(current.draft, latest) })
+      return true
+    } catch (error) {
+      if (stateRef.current.sessionId === current.sessionId) dispatch({ type: 'confirmationRefreshError', message: error.message })
+      return false
+    } finally { savingRef.current = false; setSyncBusy(false) }
+  }, [])
+
   const actions = useMemo(
     () => ({
       updateSettings: (patch) => dispatch({ type: 'settings', patch }),
@@ -235,13 +293,10 @@ export default function AnalysisSessionProvider({ children }) {
       setSessionId: (value) => dispatch({ type: 'sessionId', value }),
       clearSyncError: () => dispatch({ type: 'syncError', value: null }),
       loadDraftFromServer,
-      // S03-R → POST /confirm (목업 모드에서는 바로 통과)
-      confirmReview: () => {
-        if (savingRef.current || stateRef.current.syncError) return Promise.reject(new Error('저장 상태를 먼저 확인해 주세요.'))
-        return USE_MOCK ? Promise.resolve(null) : sessionApi.confirmSession(stateRef.current.sessionId)
-      },
+      confirmReview,
+      reloadAfterConflict,
     }),
-    [addFiles, removeFile, updateTransaction, setDuplicateDecision, setConfirmed, loadDraftFromServer, setTone],
+    [addFiles, removeFile, updateTransaction, setDuplicateDecision, setConfirmed, loadDraftFromServer, setTone, confirmReview, reloadAfterConflict],
   )
 
   const value = useMemo(() => ({ ...state, ...actions, syncBusy, toneBusy, patternResponseStore, savingsPlanStore, selectedPlan }), [state, actions, syncBusy, toneBusy, patternResponseStore, savingsPlanStore, selectedPlan])

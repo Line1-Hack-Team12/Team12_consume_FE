@@ -11,8 +11,9 @@ function isRealDate(value) {
 }
 
 /** @returns {Record<string, string>} 필드별 오류 문구 (없으면 빈 객체) */
-export function validateTransaction(t) {
+export function validateTransaction(t, { slots } = {}) {
   const errors = {}
+  if (slots && !slots.includes(t.slotMonth)) errors.slotMonth = '선택한 기간 안에서 기록의 달을 골라주세요'
   if (!isRealDate(t.date)) errors.date = '날짜를 확인해 주세요'
   else if (t.slotMonth && !t.date.startsWith(t.slotMonth)) errors.date = '이 파일의 달과 날짜가 달라요'
   if (t.time && !TIME_RE.test(t.time)) errors.time = '00:00 형식으로 적어주세요'

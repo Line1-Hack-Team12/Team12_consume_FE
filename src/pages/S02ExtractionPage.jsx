@@ -12,9 +12,10 @@ import { useAppNavigation } from '../hooks/navigationContext'
 import useJobPolling from '../hooks/useJobPolling'
 import { toExtractionJob } from '../api/adapters'
 import { USE_MOCK } from '../api/config'
-import { CAN_RETRY_WITH_FILES, getSessionStatus, proceedPartial, resetForReplace, retryFailedFiles } from '../api/sessions'
+import { getSessionStatus, proceedPartial, resetForReplace, retryFailedFiles } from '../api/sessions'
 import { getJob, retryFailedAssets } from '../mocks/jobs'
 import { buildSlots, formatMonth } from '../utils/months'
+import { buildFileRetryBatches, findRetryOriginal } from '../utils/fileRetry'
 
 const fetchSessionJob = (key) => getSessionStatus(key.split('#')[0]).then(toExtractionJob)
 const STAGES = ['내역 읽기', '가맹점 분류', '중복 정리', '패턴 후보 찾기']
@@ -33,7 +34,7 @@ export default function S02ExtractionPage({ params }) {
   const [noRows, setNoRows] = useState(false)
   const [passwords, setPasswords] = useState({})
   const reviewStarted = useRef(null)
-  const retrying = useRef(false)
+  const actionInFlight = useRef(false)
   const autoRetries = useRef(0)
   const autoJob = useRef(null)
   const jobId = USE_MOCK ? mockJobId : sessionId ? `${sessionId}#${attempt}` : null
@@ -44,12 +45,11 @@ export default function S02ExtractionPage({ params }) {
   const finished = job && ['succeeded', 'partial', 'failed', 'no_transactions'].includes(job.state)
   const slots = buildSlots(settings.lastMonth, settings.monthCount)
   const originals = useMemo(() => [...bankFiles, ...Object.entries(files).flatMap(([slotMonth, list]) => list.map((f) => ({ ...f, slotMonth })))], [bankFiles, files])
-  const originalFor = (asset) => {
-    const matches = originals.filter((f) => f.name === asset.name && f.status === 'accepted')
-    return matches.length === 1 ? matches[0] : null
-  }
+  const originalFor = (asset) => findRetryOriginal(asset, originals)
 
   const goReview = useCallback(async () => {
+    if (actionInFlight.current) return
+    actionInFlight.current = true
     setBusy(true); setActionError('')
     try {
       if (!USE_MOCK && job.state === 'partial') await proceedPartial(sessionId)
@@ -63,7 +63,7 @@ export default function S02ExtractionPage({ params }) {
       if (bankFiles.some((f) => f.status === 'accepted') && empty.length) setEmptyMonths(empty)
       else navigate(SCREEN.S03, {}, { replace: true })
     } catch (err) { setActionError(err.message) }
-    finally { setBusy(false) }
+    finally { actionInFlight.current = false; setBusy(false) }
   }, [job, sessionId, settings.lastMonth, settings.monthCount, bankFiles, loadDraftFromServer, navigate, setDraft])
 
   useEffect(() => {
@@ -73,31 +73,31 @@ export default function S02ExtractionPage({ params }) {
   }, [job?.state, jobId, goReview])
 
   const retry = useCallback(async (automatic = false) => {
-    if (retrying.current) return
-    retrying.current = true; setBusy(true); setActionError('')
+    if (actionInFlight.current || !['partial', 'failed'].includes(job?.state)) return
+    actionInFlight.current = true; setBusy(true); setActionError(''); setNoRows(false)
+    let sent = false
     try {
       if (USE_MOCK) setMockJobId((await retryFailedAssets(mockJobId)).jobId)
       else {
-        const all = [...bankFiles, ...Object.entries(files).flatMap(([slotMonth, list]) => list.map((f) => ({ ...f, slotMonth })))]
-        for (const asset of job.perAsset.filter((a) => a.status === 'failed' && a.retryable !== false)) {
-          const matches = all.filter((f) => f.name === asset.name && f.status === 'accepted')
-          if (matches.length !== 1) throw new Error('다시 읽을 원본을 확인할 수 없어요. 파일 교체를 선택해 주세요.')
-          const original = matches[0]
-          if (automatic && original.kind === 'file') continue
-          await retryFailedFiles(sessionId, [asset.assetId], { settings, consent, assets: [{ ...original, password: passwords[asset.assetId] ?? '' }] })
+        // 모든 원본을 먼저 확인해, 도중에 원본을 못 찾아 일부만 보내는 상황을 막는다.
+        const batches = buildFileRetryBatches(job.perAsset, originals, passwords, { automatic })
+        for (const batch of batches) {
+          sent = true
+          await retryFailedFiles(sessionId, batch.fileIds, { settings, consent, assets: batch.assets })
         }
-        setAttempt((n) => n + 1)
       }
-      setPasswords({})
     } catch (err) { setActionError(err.message) }
-    finally { retrying.current = false; setBusy(false) }
-  }, [bankFiles, files, job, mockJobId, sessionId, settings, consent, passwords])
+    finally {
+      // 응답이 끊겼거나 여러 묶음 중 일부만 처리됐어도 서버 상태를 다시 확인한다.
+      if (sent) { setPasswords({}); setAttempt((n) => n + 1) }
+      actionInFlight.current = false; setBusy(false)
+    }
+  }, [originals, job, mockJobId, sessionId, settings, consent, passwords])
 
   useEffect(() => {
-    const targets = job?.perAsset?.filter((a) => a.status === 'failed') ?? []
-    if ((!USE_MOCK && !CAN_RETRY_WITH_FILES) || !['partial', 'failed'].includes(job?.state) || !targets.length || autoRetries.current >= 2 || actionError || autoJob.current === jobId) return
+    const targets = job?.perAsset?.filter((a) => a.status === 'failed' && a.retryable === true && findRetryOriginal(a, originals)?.kind === 'image') ?? []
+    if (!['partial', 'failed'].includes(job?.state) || !targets.length || Math.max(autoRetries.current, job.autoRetryCount ?? 0) >= 2 || actionError || autoJob.current === jobId || actionInFlight.current) return
     // 파일 암호는 보관하지 않으므로 은행 파일은 암호를 다시 입력한 뒤 수동 재시도한다.
-    if (!targets.every((a) => a.retryable === true && originals.filter((f) => f.name === a.name).length === 1 && originals.find((f) => f.name === a.name)?.kind === 'image')) return
     let active = true
     queueMicrotask(() => {
       if (!active || autoJob.current === jobId) return
@@ -109,12 +109,14 @@ export default function S02ExtractionPage({ params }) {
   }, [job, jobId, originals, actionError, retry])
 
   const replace = async () => {
-    if (busy) return
+    if (actionInFlight.current) return
+    actionInFlight.current = true
     setBusy(true)
     try {
       if (!USE_MOCK) await resetForReplace(sessionId)
       navigate(SCREEN.S01, {}, { replace: true })
-    } catch (err) { setActionError(err.message); setBusy(false) }
+    } catch (err) { setActionError(err.message) }
+    finally { actionInFlight.current = false; setBusy(false) }
   }
 
   if (!jobId) return <ScreenLayout title="진행 중인 작업이 없어요" footer={<Button onClick={() => navigate(SCREEN.S01)}>내역 올리러 가기</Button>}><Note>설정 화면에서 내역을 선택해 주세요.</Note></ScreenLayout>
@@ -131,9 +133,9 @@ export default function S02ExtractionPage({ params }) {
     footer={<>
       {actionError ? <p role="alert" className="text-caption text-danger-ink">{actionError}</p> : null}
       {noTransactions ? <Button disabled={busy} onClick={replace}>내역 교체하기</Button> : <>
-        {(USE_MOCK || CAN_RETRY_WITH_FILES) && failed.some((a) => a.retryable !== false) ? <Button disabled={busy} onClick={() => retry()}>{busy ? '다시 읽는 중…' : '실패한 파일만 다시 읽기'}</Button> : null}
+        {finished && failed.some((a) => a.retryable !== false) ? <Button disabled={busy} onClick={() => retry()}>{busy ? '다시 읽는 중…' : '실패한 파일만 다시 읽기'}</Button> : null}
         {finished && succeeded > 0 ? <Button disabled={busy} onClick={goReview}>{busy ? '불러오는 중…' : '성공한 내역으로 검토'}</Button> : null}
-        {failed.length > 0 ? <Button variant="secondary" disabled={busy} onClick={replace}>파일·암호 교체하기</Button> : null}
+        {finished && failed.length > 0 ? <Button variant="secondary" disabled={busy} onClick={replace}>파일·암호 교체하기</Button> : null}
       </>}
     </>}>
     <section className="flex flex-col gap-3 rounded-2xl bg-surface p-4" aria-live="polite">
@@ -146,10 +148,12 @@ export default function S02ExtractionPage({ params }) {
         <p className="truncate text-body-b" title={asset.name}>{asset.name}</p>
         <p className="text-caption text-ink-2">{STATUS[asset.status] ?? '확인 중'}</p>
         {asset.reason ? <p className="text-caption text-danger-ink">{asset.reason}</p> : null}
-        {(USE_MOCK || CAN_RETRY_WITH_FILES) && asset.status === 'failed' && asset.retryable !== false && originalFor(asset)?.kind === 'file'
-          ? <TextField label="다시 읽을 파일의 열기 암호" type="password" autoComplete="off" value={passwords[asset.assetId] ?? ''} onChange={(e) => setPasswords((prev) => ({ ...prev, [asset.assetId]: e.target.value }))} /> : null}
+        {finished && asset.status === 'failed' && asset.retryable !== false && originalFor(asset)?.kind === 'file'
+          ? <TextField label={`${asset.name} 열기 암호 다시 입력`} type="password" autoComplete="off" disabled={busy} value={passwords[asset.assetId] ?? ''} onChange={(e) => setPasswords((prev) => ({ ...prev, [asset.assetId]: e.target.value }))} /> : null}
+        {finished && asset.status === 'failed' && !originalFor(asset) ? <p className="text-caption text-ink-2">원본 파일을 구분할 수 없어요. 파일·암호 교체하기로 다시 선택해 주세요.</p> : null}
       </li>)}
     </ul>
+    {finished && failed.length > 0 ? <Note tone="gray">성공한 파일은 유지하고 실패한 파일만 다시 읽어요. 엑셀에 암호가 있으면 다시 입력해 주세요.</Note> : null}
     {hasBank ? <Note tone="gray">선택한 기간: {slots.map(formatMonth).join(', ')}. 파일에서 읽은 월별 내역은 검토 화면에서 확인할 수 있어요.</Note> : null}
     {error ? <Note tone="warn">서버 상태를 다시 확인하고 있어요. 연결이 계속 안 되면 잠시 후 다시 시도해 주세요.</Note> : null}
     <ConfirmDialog open={emptyMonths.length > 0} title={`${emptyMonths.map(formatMonth).join(', ')} 내역이 없어요`} confirmLabel="빈 달을 빼고 진행" cancelLabel="내역 추가하기"

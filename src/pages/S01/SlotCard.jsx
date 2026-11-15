@@ -48,7 +48,7 @@ export default function SlotCard({ month, files, disabled, onAdd, onRemove, kind
       <div className="flex items-center gap-2.5">
         <h3 className="flex-1 text-body-b">{title}</h3>
         <span className={`text-caption-m ${accepted.length ? 'text-brand' : 'text-ink-3'}`}>{accepted.length}개</span>
-        <input id={inputId} type="file" accept={isBank ? BANK_ACCEPT_ATTR : SUPPLEMENT_ACCEPT_ATTR} multiple className="peer sr-only" disabled={disabled || checking} onChange={handleChange} />
+        <input id={inputId} type="file" accept={isBank ? BANK_ACCEPT_ATTR : IMAGE_ACCEPT_ATTR} multiple className="peer sr-only" disabled={disabled || checking} onChange={handleChange} />
         <label
           htmlFor={inputId}
           className={`inline-flex min-h-11 shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-caption-m peer-focus-visible:outline-2 peer-focus-visible:outline-brand ${
@@ -91,7 +91,11 @@ export default function SlotCard({ month, files, disabled, onAdd, onRemove, kind
           ))}
         </ul>
       ) : (
+<<<<<<< HEAD
         <p className="text-caption text-ink-3">{isBank ? '.xlsx · 파일당 20MB · 여러 달을 한 번에 올릴 수 있어요.' : '간편결제·카드사 내역을 캡처 또는 PDF로 추가할 수 있어요.'}</p>
+=======
+        <p className="text-caption text-ink-3">{isBank ? '.xlsx · 파일당 20MB · 여러 달을 한 번에 올릴 수 있어요.' : '간편결제·카드사 내역을 JPG·JPEG·PNG·WebP 캡처로 추가할 수 있어요.'}</p>
+>>>>>>> 09cd1b1c21dbb224716d5fa31756a46bf74fd521
       )}
 
       {rejected.length > 0 ? (
